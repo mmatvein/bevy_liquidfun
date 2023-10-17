@@ -52,7 +52,7 @@ fn setup_physics_bodies(mut commands: Commands, mut b2_world: NonSendMut<b2World
 
 
     let circle_shape = b2Shape::Circle { radius: 1. };
-    let fixture_def = &b2FixtureDef::new(circle_shape, 1.);
+    let fixture_def = b2FixtureDef::new(circle_shape, 1.);
     for i in 0..10 {
         let body_def = b2BodyDef {
             body_type: Dynamic,
