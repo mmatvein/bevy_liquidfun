@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use rand::prelude::*;
 
 use bevy_liquidfun::dynamics::b2FixtureDef;
-use bevy_liquidfun::plugins::{LiquidfunDebugDrawPlugin, LiquidfunPlugin};
+use bevy_liquidfun::plugins::{LiquidFunDebugDrawPlugin, LiquidFunPlugin};
 use bevy_liquidfun::utils::DebugDrawFixtures;
 use bevy_liquidfun::{
     collision::b2Shape,
@@ -48,7 +48,7 @@ fn main() {
     ];
 
     App::new()
-        .add_plugins((DefaultPlugins, LiquidfunPlugin, LiquidfunDebugDrawPlugin))
+        .add_plugins((DefaultPlugins, LiquidFunPlugin, LiquidFunDebugDrawPlugin))
         .insert_resource(ShapeCollection {
             shapes: available_shapes,
         })

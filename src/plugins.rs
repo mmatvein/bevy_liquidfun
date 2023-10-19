@@ -4,9 +4,9 @@ use crate::utils::DebugDrawFixtures;
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 
-pub struct LiquidfunPlugin;
+pub struct LiquidFunPlugin;
 
-impl Plugin for LiquidfunPlugin {
+impl Plugin for LiquidFunPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             FixedUpdate,
@@ -61,9 +61,9 @@ fn update_transforms(mut bodies: Query<(&b2Body, &mut Transform)>) {
         transform.rotation = Quat::from_rotation_z(body.angle);
     }
 }
-pub struct LiquidfunDebugDrawPlugin;
+pub struct LiquidFunDebugDrawPlugin;
 
-impl Plugin for LiquidfunDebugDrawPlugin {
+impl Plugin for LiquidFunDebugDrawPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PostUpdate,
