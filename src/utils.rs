@@ -1,12 +1,37 @@
-use bevy::math::Vec2;
-use libliquidfun_sys::box2d::ffi::b2Vec2;
+use bevy::prelude::*;
 
-#[allow(non_snake_case)]
-pub(crate) fn to_b2Vec2(vec2: Vec2) -> b2Vec2 {
-    b2Vec2 { x: vec2.x, y: vec2.y }
+#[derive(Component)]
+pub struct DebugDrawFixtures {
+    pub awake_color: Color,
+    pub asleep_color: Color,
+
+    pub pivot_scale: f32,
+    pub draw_pivot: bool,
+    pub vector_scale: f32,
+    pub draw_up_vector: bool,
+    pub draw_right_vector: bool,
 }
 
-#[allow(non_snake_case)]
-pub(crate) fn to_Vec2(b2vec2: &b2Vec2) -> Vec2 {
-    return Vec2::new(b2vec2.x, b2vec2.y);
+impl Default for DebugDrawFixtures {
+    fn default() -> Self {
+        Self {
+            awake_color: Color::GREEN,
+            asleep_color: Color::DARK_GRAY,
+            pivot_scale: 0.1,
+            draw_pivot: false,
+            vector_scale: 1.,
+            draw_up_vector: false,
+            draw_right_vector: false,
+        }
+    }
+}
+
+impl DebugDrawFixtures {
+    pub fn splat(color: Color) -> Self {
+        Self {
+            awake_color: color,
+            asleep_color: color,
+            ..default()
+        }
+    }
 }
