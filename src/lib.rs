@@ -1,5 +1,6 @@
 pub mod collision;
 pub mod dynamics;
+pub mod particles;
 pub mod plugins;
 pub mod utils;
 

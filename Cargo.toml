@@ -3,12 +3,11 @@ name = "bevy_liquidfun"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+autocxx = "0.26.0"
+bitflags = "2.4.1"
 bevy = "0.11"
 libliquidfun-sys = { git = "https://github.com/mmatvein/libliquidfun-sys.git" }
-autocxx = "0.26.0"
 
 [dev-dependencies]
 rand = "0.8"

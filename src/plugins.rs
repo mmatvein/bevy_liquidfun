@@ -1,6 +1,8 @@
 use crate::collision::b2Shape;
 use crate::dynamics::{b2Body, b2Fixture, b2World};
-use crate::utils::DebugDrawFixtures;
+use crate::particles::particle_group::b2ParticleGroup;
+use crate::particles::particle_system::b2ParticleSystem;
+use crate::utils::{DebugDrawFixtures, DebugDrawParticleSystem};
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 
@@ -13,6 +15,8 @@ impl Plugin for LiquidFunPlugin {
             (
                 create_bodies,
                 create_fixtures,
+                create_particle_systems,
+                create_particle_groups,
                 destroy_removed_fixtures,
                 destroy_removed_bodies,
                 apply_deferred,
@@ -33,7 +37,7 @@ impl Plugin for LiquidFunPlugin {
 }
 
 fn step_physics(mut b2_world: NonSendMut<b2World>) {
-    b2_world.step(0.02, 8, 3, 100);
+    b2_world.step(0.02, 8, 3, 5);
 }
 
 fn create_bodies(
@@ -53,6 +57,28 @@ fn create_fixtures(
     for (fixture_entity, mut fixture) in added.iter_mut() {
         let mut body = bodies.get_mut(fixture.get_body_entity()).unwrap();
         b2_world.create_fixture((fixture_entity, &mut fixture), (body.0, &mut body.1));
+    }
+}
+
+fn create_particle_systems(
+    mut b2_world: NonSendMut<b2World>,
+    mut added: Query<(Entity, &mut b2ParticleSystem), Added<b2ParticleSystem>>,
+) {
+    for (entity, mut particle_system) in added.iter_mut() {
+        b2_world.create_particle_system(entity, &mut particle_system);
+    }
+}
+
+fn create_particle_groups(
+    mut b2_world: NonSendMut<b2World>,
+    mut added_groups: Query<(Entity, &mut b2ParticleGroup), Added<b2ParticleGroup>>,
+) {
+    for (entity, mut particle_group) in added_groups.iter_mut() {
+        b2_world.create_particle_group(
+            particle_group.get_particle_system_entity(),
+            entity,
+            &mut particle_group,
+        );
     }
 }
 
@@ -105,9 +131,12 @@ impl Plugin for LiquidFunDebugDrawPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Last,
-            draw_fixtures
-                .after(TransformSystem::TransformPropagate)
-                .after(destroy_removed_bodies),
+            (
+                draw_fixtures
+                    .after(TransformSystem::TransformPropagate)
+                    .after(destroy_removed_bodies),
+                draw_particle_systems.after(TransformSystem::TransformPropagate),
+            ),
         );
     }
 }
@@ -129,8 +158,8 @@ fn draw_fixtures(
         };
         let shape = fixture.get_shape();
         match shape {
-            b2Shape::Circle { radius } => {
-                gizmos.circle_2d(transform.translation().truncate(), *radius, color);
+            b2Shape::Circle { radius, position } => {
+                gizmos.circle_2d(to_global(transform, *position), *radius, color);
             }
             b2Shape::EdgeTwoSided { v1, v2 } => {
                 gizmos.line_2d(to_global(transform, *v1), to_global(transform, *v2), color);
@@ -164,6 +193,30 @@ fn draw_fixtures(
                 body.position + transform.right().truncate() * debug_draw_fixtures.vector_scale,
                 Color::RED,
             );
+        }
+    }
+}
+
+fn draw_particle_systems(
+    b2_world: NonSend<b2World>,
+    particle_systems: Query<(Entity, &b2ParticleSystem, &DebugDrawParticleSystem)>,
+    mut gizmos: Gizmos,
+) {
+    for (entity, particle_system, _debug_draw) in particle_systems.iter() {
+        let ptr = b2_world.particle_system_ptrs.get(&entity).unwrap();
+        let positions = ptr.as_ref().GetPositionBuffer1();
+        let count: i32 = ptr.GetParticleCount().into();
+        for i in 0..count {
+            unsafe {
+                let position = positions.offset(i.try_into().unwrap());
+                let position = position.as_ref().unwrap();
+                let position = Vec2::new(position.x, position.y);
+                gizmos.circle_2d(
+                    position,
+                    particle_system.get_definition().radius,
+                    Color::WHITE,
+                );
+            }
         }
     }
 }

@@ -8,6 +8,8 @@ use libliquidfun_sys::box2d::*;
 
 use crate::collision::b2Shape;
 use crate::internal::*;
+use crate::particles::particle_group::b2ParticleGroup;
+use crate::particles::particle_system::b2ParticleSystem;
 
 #[derive(Debug, Copy, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
 pub struct BodyHandle(u64);
@@ -21,6 +23,7 @@ pub struct b2World<'a> {
 
     body_ptrs: HashMap<Entity, Pin<&'a mut ffi::b2Body>>,
     fixture_ptrs: HashMap<Entity, Pin<&'a mut ffi::b2Fixture>>,
+    pub(crate) particle_system_ptrs: HashMap<Entity, Pin<&'a mut ffi::b2ParticleSystem>>,
 
     body_to_fixtures: HashMap<Entity, HashSet<Entity>>,
     fixture_to_body: HashMap<Entity, Entity>,
@@ -37,6 +40,7 @@ impl<'a> b2World<'a> {
             ffi_world,
             body_ptrs: HashMap::new(),
             fixture_ptrs: HashMap::new(),
+            particle_system_ptrs: HashMap::new(),
             body_to_fixtures: HashMap::new(),
             fixture_to_body: HashMap::new(),
         }
@@ -117,6 +121,35 @@ impl<'a> b2World<'a> {
                 .as_mut()
                 .DestroyFixture(fixture_ptr.get_unchecked_mut());
         }
+    }
+
+    pub(crate) fn create_particle_system(
+        &mut self,
+        entity: Entity,
+        particle_system: &b2ParticleSystem,
+    ) {
+        let definition = particle_system.get_definition().to_ffi();
+        let definition: *const ffi::b2ParticleSystemDef = &definition;
+        unsafe {
+            let ffi_particle_system = self.ffi_world.as_mut().CreateParticleSystem(definition);
+            let ffi_particle_system = Pin::new_unchecked(ffi_particle_system.as_mut().unwrap());
+            self.particle_system_ptrs
+                .insert(entity, ffi_particle_system);
+        }
+    }
+
+    pub(crate) fn create_particle_group(
+        &mut self,
+        particle_system_entity: Entity,
+        _entity: Entity,
+        particle_group: &b2ParticleGroup,
+    ) {
+        let particle_system_ptr = self
+            .particle_system_ptrs
+            .get_mut(&particle_system_entity)
+            .unwrap();
+        let def = particle_group.get_definition().to_ffi();
+        particle_system_ptr.as_mut().CreateParticleGroup(def);
     }
 
     pub fn step(

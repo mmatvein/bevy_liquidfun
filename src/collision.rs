@@ -9,7 +9,7 @@ use crate::internal::*;
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone)]
 pub enum b2Shape {
-    Circle { radius: f32 },
+    Circle { radius: f32, position: Vec2 },
     EdgeTwoSided { v1: Vec2, v2: Vec2 },
     Polygon { vertices: Vec<Vec2> },
 }
@@ -40,7 +40,7 @@ impl b2Shape {
     }
     pub(crate) fn to_ffi<'a>(&self) -> &'a ffi::b2Shape {
         match self {
-            b2Shape::Circle { radius } => circle_to_ffi(*radius),
+            b2Shape::Circle { radius, position } => circle_to_ffi(*radius, *position),
             b2Shape::EdgeTwoSided { v1, v2 } => edge_to_ffi(*v1, *v2),
             b2Shape::Polygon { vertices } => polygon_to_ffi(vertices),
         }
@@ -49,13 +49,17 @@ impl b2Shape {
 
 impl Default for b2Shape {
     fn default() -> Self {
-        Self::Circle { radius: 1.0 }
+        Self::Circle {
+            radius: 1.0,
+            position: Vec2::default(),
+        }
     }
 }
 
-fn circle_to_ffi<'a>(radius: f32) -> &'a ffi::b2Shape {
+fn circle_to_ffi<'a>(radius: f32, position: Vec2) -> &'a ffi::b2Shape {
     let mut shape = ffi::b2CircleShape::new().within_unique_ptr();
     ffi::SetCircleRadius(shape.pin_mut(), radius);
+    ffi::SetCirclePosition(shape.pin_mut(), &to_b2Vec2(position));
 
     let shape_ptr = shape.into_raw();
     unsafe {
