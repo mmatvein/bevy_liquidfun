@@ -61,9 +61,9 @@ fn update_transforms(mut bodies: Query<(&b2Body, &mut Transform)>) {
         transform.rotation = Quat::from_rotation_z(body.angle);
     }
 }
-pub struct DebugDrawPhysicsPlugin;
+pub struct LiquidfunDebugDrawPlugin;
 
-impl Plugin for DebugDrawPhysicsPlugin {
+impl Plugin for LiquidfunDebugDrawPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PostUpdate,
