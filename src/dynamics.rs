@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 
 use autocxx::WithinBox;
@@ -19,12 +19,11 @@ pub struct FixtureHandle(u64);
 pub struct b2World<'a> {
     ffi_world: Pin<Box<ffi::b2World>>,
 
-    next_body_handle: BodyHandle,
-    bodies: HashMap<BodyHandle, Pin<&'a mut ffi::b2Body>>,
-    entity_body_registrations: HashMap<Entity, BodyHandle>,
+    body_ptrs: HashMap<Entity, Pin<&'a mut ffi::b2Body>>,
+    fixture_ptrs: HashMap<Entity, Pin<&'a mut ffi::b2Fixture>>,
 
-    next_fixture_handle: FixtureHandle,
-    fixtures: HashMap<FixtureHandle, Pin<&'a mut ffi::b2Fixture>>,
+    body_to_fixtures: HashMap<Entity, HashSet<Entity>>,
+    fixture_to_body: HashMap<Entity, Entity>,
 
     pub gravity: Vec2,
 }
@@ -36,67 +35,90 @@ impl<'a> b2World<'a> {
         b2World {
             gravity,
             ffi_world,
-            next_body_handle: BodyHandle(0),
-            bodies: HashMap::new(),
-            entity_body_registrations: HashMap::new(),
-            next_fixture_handle: FixtureHandle(0),
-            fixtures: HashMap::new(),
+            body_ptrs: HashMap::new(),
+            fixture_ptrs: HashMap::new(),
+            body_to_fixtures: HashMap::new(),
+            fixture_to_body: HashMap::new(),
         }
     }
 
-    pub fn create_body(&mut self, body_def: &b2BodyDef) -> b2Body {
+    pub(crate) fn create_body(&mut self, entity: Entity, body: &mut b2Body) {
         let mut b2body_def = ffi::b2BodyDef::new().within_box();
-        b2body_def.type_ = body_def.body_type.into();
-        b2body_def.position = to_b2Vec2(body_def.position);
+        b2body_def.type_ = body.body_type.into();
+        b2body_def.position = to_b2Vec2(body.position);
 
-        let handle = self.next_body_handle;
         unsafe {
-            let body = self.ffi_world.as_mut().CreateBody(&*b2body_def);
-            let body = Pin::new_unchecked(body.as_mut().unwrap());
-            self.bodies.insert(handle, body);
+            let ffi_body = self.ffi_world.as_mut().CreateBody(&*b2body_def);
+            let ffi_body = Pin::new_unchecked(ffi_body.as_mut().unwrap());
+            self.body_ptrs.insert(entity, ffi_body);
         }
-
-        self.next_body_handle = BodyHandle(self.next_body_handle.0 + 1);
-        return b2Body::new(handle, body_def);
-    }
-
-    pub(crate) fn register_entity_for_body(&mut self, entity: Entity, body: &b2Body) {
-        assert!(
-            !self.entity_body_registrations.contains_key(&entity),
-            "Attempt to register an already registered entity-body connection."
-        );
-        self.entity_body_registrations
-            .insert(entity, body.body_handle);
     }
 
     pub(crate) fn destroy_body_for_entity(&mut self, entity: Entity) {
-        let body_handle = self.entity_body_registrations.get(&entity).unwrap();
-        let body_ptr = self.bodies.remove(body_handle).unwrap();
+        let body_ptr = self.body_ptrs.remove(&entity).unwrap();
+        let fixtures = self.body_to_fixtures.remove(&entity);
+        if let Some(fixtures) = fixtures {
+            fixtures.iter().for_each(|f| {
+                self.fixture_to_body.remove(&f);
+                self.fixture_ptrs.remove(&f);
+            });
+        }
+
         unsafe {
             let body_ptr = Pin::into_inner_unchecked(body_ptr);
             self.ffi_world.as_mut().DestroyBody(body_ptr);
         }
     }
 
-    pub fn create_fixture(
+    pub(crate) fn create_fixture(
         &mut self,
-        body: &mut b2Body,
-        fixture_def: &b2FixtureDef,
-    ) -> FixtureHandle {
-        let mut body_ptr = self.bodies.get_mut(&body.body_handle).unwrap().as_mut();
-        let b2fixture_def = fixture_def.to_ffi();
+        fixture: (Entity, &mut b2Fixture),
+        body: (Entity, &mut b2Body),
+    ) {
+        let (fixture_entity, fixture_component) = fixture;
+        let (body_entity, body_component) = body;
 
-        let handle = self.next_fixture_handle;
+        let mut body_ptr = self.body_ptrs.get_mut(&body_entity).unwrap().as_mut();
+        let b2fixture_def = fixture_component.extract_fixture_def().to_ffi();
+
         unsafe {
-            let fixture = body_ptr.as_mut().CreateFixture(&*b2fixture_def);
-            let fixture = Pin::new_unchecked(fixture.as_mut().unwrap());
-            self.fixtures.insert(handle, fixture);
+            let ffi_fixture = body_ptr.as_mut().CreateFixture(&*b2fixture_def);
+            let ffi_fixture = Pin::new_unchecked(ffi_fixture.as_mut().unwrap());
+            self.fixture_ptrs.insert(fixture_entity, ffi_fixture);
         }
 
-        body.fixtures.insert(handle, b2Fixture::new(fixture_def));
-        self.next_fixture_handle = FixtureHandle(self.next_fixture_handle.0 + 1);
-        return handle;
+        body_component.fixtures.insert(fixture_entity);
+        let fixtures_for_body = self.body_to_fixtures.entry(body.0).or_default();
+        fixtures_for_body.insert(fixture_entity);
+        self.fixture_to_body.insert(fixture_entity, body_entity);
     }
+
+    pub(crate) fn destroy_fixture_for_entity(&mut self, entity: Entity) {
+        let fixture_ptr = self.fixture_ptrs.remove(&entity);
+
+        // The body (and the fixture along with it) might have already been destroyed on the C++
+        // side through DestroyBody
+        if let None = fixture_ptr {
+            return;
+        }
+
+        let fixture_ptr = fixture_ptr.unwrap();
+
+        let body_entity = self.fixture_to_body.remove(&entity).unwrap();
+        self.body_to_fixtures
+            .get_mut(&body_entity)
+            .unwrap()
+            .remove(&entity);
+
+        let body_ptr = self.body_ptrs.get_mut(&body_entity).unwrap();
+
+        unsafe {
+            body_ptr
+                .as_mut()
+                .DestroyFixture(fixture_ptr.get_unchecked_mut());
+        }
+    }
+
     pub fn step(
         &mut self,
         time_step: f32,
@@ -110,6 +132,13 @@ impl<'a> b2World<'a> {
             ffi::int32::from(position_iterations),
             ffi::int32::from(particle_iterations),
         )
+    }
+
+    pub(crate) fn get_fixtures_attached_to_entity(
+        &self,
+        body_entity: &Entity,
+    ) -> Option<&HashSet<Entity>> {
+        self.body_to_fixtures.get(body_entity)
     }
 }
 
@@ -145,8 +174,7 @@ impl Into<ffi::b2BodyType> for b2BodyType {
 #[allow(non_camel_case_types)]
 #[derive(Debug, Component)]
 pub struct b2Body {
-    body_handle: BodyHandle,
-    pub fixtures: HashMap<FixtureHandle, b2Fixture>,
+    pub(crate) fixtures: HashSet<Entity>,
 
     pub body_type: b2BodyType,
     pub position: Vec2,
@@ -158,10 +186,9 @@ pub struct b2Body {
 }
 
 impl b2Body {
-    fn new(body_handle: BodyHandle, body_def: &b2BodyDef) -> Self {
+    pub fn new(body_def: &b2BodyDef) -> Self {
         b2Body {
-            body_handle,
-            fixtures: HashMap::new(),
+            fixtures: HashSet::new(),
             body_type: body_def.body_type,
             position: body_def.position,
             angle: body_def.angle,
@@ -171,8 +198,8 @@ impl b2Body {
         }
     }
 
-    pub fn sync_with_world(&mut self, world: &b2World) {
-        let body_ptr = world.bodies.get(&self.body_handle).unwrap();
+    pub fn sync_with_world(&mut self, entity: Entity, world: &b2World) {
+        let body_ptr = world.body_ptrs.get(&entity).unwrap();
         self.position = to_Vec2(body_ptr.as_ref().GetPosition());
         self.angle = body_ptr.as_ref().GetAngle();
         self.linear_velocity = to_Vec2(body_ptr.as_ref().GetLinearVelocity());
@@ -180,15 +207,15 @@ impl b2Body {
         self.awake = body_ptr.as_ref().IsAwake();
     }
 
-    pub fn sync_to_world(&self, world: &mut b2World) {
-        let body_ptr = world.bodies.get_mut(&self.body_handle).unwrap();
+    pub fn sync_to_world(&self, entity: Entity, world: &mut b2World) {
+        let body_ptr = world.body_ptrs.get_mut(&entity).unwrap();
         body_ptr
             .as_mut()
             .SetTransform(&to_b2Vec2(self.position), self.angle);
         body_ptr
             .as_mut()
             .SetLinearVelocity(&to_b2Vec2(self.linear_velocity));
-        // body_ptr.as_mut().SetAwake(self.awake);
+        body_ptr.as_mut().SetAwake(self.awake);
     }
 
     pub fn get_mass(&self) -> f32 {
@@ -205,19 +232,38 @@ pub struct b2BodyDef {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Debug)]
+#[derive(Component, Debug)]
 pub struct b2Fixture {
+    body: Entity,
     shape: b2Shape,
+    density: f32,
+    friction: f32,
 }
 
 impl b2Fixture {
-    pub fn new(fixture_def: &b2FixtureDef) -> Self {
+    pub fn new(body: Entity, fixture_def: &b2FixtureDef) -> Self {
         b2Fixture {
+            body,
             shape: fixture_def.shape.clone(),
+            density: fixture_def.density,
+            friction: fixture_def.friction,
         }
     }
+
+    pub fn get_body_entity(&self) -> Entity {
+        self.body
+    }
+
     pub fn get_shape(&self) -> &b2Shape {
         &self.shape
+    }
+
+    fn extract_fixture_def(&self) -> b2FixtureDef {
+        b2FixtureDef {
+            shape: self.shape.clone(),
+            density: self.density,
+            friction: self.friction,
+        }
     }
 }
 

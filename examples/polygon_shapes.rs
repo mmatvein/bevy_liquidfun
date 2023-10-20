@@ -8,7 +8,7 @@ use bevy::input::prelude::*;
 use bevy::prelude::*;
 use rand::prelude::*;
 
-use bevy_liquidfun::dynamics::b2FixtureDef;
+use bevy_liquidfun::dynamics::{b2Body, b2Fixture, b2FixtureDef};
 use bevy_liquidfun::plugins::{LiquidFunDebugDrawPlugin, LiquidFunPlugin};
 use bevy_liquidfun::utils::DebugDrawFixtures;
 use bevy_liquidfun::{
@@ -55,10 +55,7 @@ fn main() {
         .add_systems(Startup, (setup_camera, setup_instructions))
         .add_systems(
             Startup,
-            (
-                setup_physics_world,
-                setup_physics_bodies.after(setup_physics_world),
-            ),
+            (setup_physics_world, setup_ground.after(setup_physics_world)),
         )
         .add_systems(Update, (check_create_body_keys, check_delete_body_key))
         .insert_resource(FixedTime::new_from_secs(FIXED_TIMESTEP))
@@ -96,27 +93,28 @@ fn setup_instructions(mut commands: Commands) {
         }),
     );
 }
+
 fn setup_physics_world(world: &mut World) {
     let gravity = Vec2::new(0., -9.81);
     let b2_world = b2World::new(gravity);
     world.insert_non_send_resource(b2_world);
 }
 
-fn setup_physics_bodies(mut commands: Commands, mut b2_world: NonSendMut<b2World>) {
+fn setup_ground(mut commands: Commands) {
     {
         let body_def = b2BodyDef::default();
-        let mut ground = b2_world.create_body(&body_def);
+
+        let ground_entity = commands
+            .spawn((TransformBundle::default(), b2Body::new(&body_def)))
+            .id();
 
         let shape = b2Shape::EdgeTwoSided {
             v1: Vec2::new(-40., 0.),
             v2: Vec2::new(40., 0.),
         };
         let fixture_def = b2FixtureDef::new(shape, 0.);
-        b2_world.create_fixture(&mut ground, &fixture_def);
-
         commands.spawn((
-            TransformBundle::default(),
-            ground,
+            b2Fixture::new(ground_entity, &fixture_def),
             DebugDrawFixtures::splat(Color::MIDNIGHT_BLUE),
         ));
     }
@@ -125,7 +123,6 @@ fn setup_physics_bodies(mut commands: Commands, mut b2_world: NonSendMut<b2World
 fn check_create_body_keys(
     key_input: Res<Input<KeyCode>>,
     shape_collection: Res<ShapeCollection>,
-    b2_world: NonSendMut<b2World>,
     commands: Commands,
 ) {
     let mut shape_index = None;
@@ -143,11 +140,11 @@ fn check_create_body_keys(
 
     if let Some(i) = shape_index {
         let shape = &shape_collection.shapes[i];
-        create_body(shape, b2_world, commands);
+        create_body(shape, commands);
     }
 }
 
-fn create_body(shape: &b2Shape, mut b2_world: NonSendMut<b2World>, mut commands: Commands) {
+fn create_body(shape: &b2Shape, mut commands: Commands) {
     let mut rng = thread_rng();
     let body_def = b2BodyDef {
         body_type: Dynamic,
@@ -155,23 +152,26 @@ fn create_body(shape: &b2Shape, mut b2_world: NonSendMut<b2World>, mut commands:
         angle: rng.gen_range(-PI..=PI),
         ..default()
     };
+    let body_entity = commands
+        .spawn((
+            TransformBundle {
+                local: Transform::from_translation(body_def.position.extend(0.)),
+                ..default()
+            },
+            b2Body::new(&body_def),
+            AllowDestroy,
+        ))
+        .id();
 
-    let mut body = b2_world.create_body(&body_def);
     let fixture_def = b2FixtureDef {
         shape: shape.clone(),
         density: 1.0,
         friction: 0.3,
         ..default()
     };
-    b2_world.create_fixture(&mut body, &fixture_def);
 
     commands.spawn((
-        TransformBundle {
-            local: Transform::from_translation(body_def.position.extend(0.)),
-            ..default()
-        },
-        body,
-        AllowDestroy,
+        b2Fixture::new(body_entity, &fixture_def),
         DebugDrawFixtures {
             awake_color: Color::GOLD,
             draw_pivot: true,

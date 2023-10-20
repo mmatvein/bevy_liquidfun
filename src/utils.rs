@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct DebugDrawFixtures {
     pub awake_color: Color,
     pub asleep_color: Color,

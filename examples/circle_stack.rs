@@ -3,7 +3,7 @@ extern crate bevy_liquidfun;
 
 use bevy::prelude::*;
 
-use bevy_liquidfun::dynamics::b2FixtureDef;
+use bevy_liquidfun::dynamics::{b2Body, b2Fixture, b2FixtureDef};
 use bevy_liquidfun::plugins::{LiquidFunDebugDrawPlugin, LiquidFunPlugin};
 use bevy_liquidfun::utils::DebugDrawFixtures;
 use bevy_liquidfun::{
@@ -47,21 +47,20 @@ fn setup_physics_world(world: &mut World) {
     world.insert_non_send_resource(b2_world);
 }
 
-fn setup_physics_bodies(mut commands: Commands, mut b2_world: NonSendMut<b2World>) {
+fn setup_physics_bodies(mut commands: Commands) {
     {
         let body_def = b2BodyDef::default();
-        let mut ground = b2_world.create_body(&body_def);
+        let ground_entity = commands
+            .spawn((TransformBundle::default(), b2Body::new(&body_def)))
+            .id();
 
         let shape = b2Shape::EdgeTwoSided {
             v1: Vec2::new(-40., 0.),
             v2: Vec2::new(40., 0.),
         };
         let fixture_def = b2FixtureDef::new(shape, 0.);
-        b2_world.create_fixture(&mut ground, &fixture_def);
-
         commands.spawn((
-            TransformBundle::default(),
-            ground,
+            b2Fixture::new(ground_entity, &fixture_def),
             DebugDrawFixtures::splat(Color::MIDNIGHT_BLUE),
         ));
     }
@@ -74,13 +73,12 @@ fn setup_physics_bodies(mut commands: Commands, mut b2_world: NonSendMut<b2World
             position: Vec2::new(0., 4. + 3. * i as f32),
             ..default()
         };
-        let mut body = b2_world.create_body(&body_def);
+        let mut body = b2Body::new(&body_def);
         body.linear_velocity = Vec2::new(0., -50.);
-        b2_world.create_fixture(&mut body, &fixture_def);
+        let body_entity = commands.spawn((TransformBundle::default(), body)).id();
 
         commands.spawn((
-            TransformBundle::default(),
-            body,
+            b2Fixture::new(body_entity, &fixture_def),
             DebugDrawFixtures {
                 awake_color: Color::ORANGE,
                 draw_up_vector: true,
