@@ -44,7 +44,10 @@ fn main() {
         },
         b2Shape::create_regular_polygon(8, 1., 0.),
         b2Shape::create_box(0.5, 0.5),
-        b2Shape::Circle { radius: 0.5 },
+        b2Shape::Circle {
+            radius: 0.5,
+            position: Vec2::ZERO,
+        },
     ];
 
     App::new()

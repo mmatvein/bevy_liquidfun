@@ -65,7 +65,10 @@ fn setup_physics_bodies(mut commands: Commands) {
         ));
     }
 
-    let circle_shape = b2Shape::Circle { radius: 1. };
+    let circle_shape = b2Shape::Circle {
+        radius: 1.,
+        position: Vec2::ZERO,
+    };
     let fixture_def = b2FixtureDef::new(circle_shape, 1.);
     for i in 0..10 {
         let body_def = b2BodyDef {
