@@ -133,12 +133,12 @@ impl<'a> b2World<'a> {
         unsafe {
             let ffi_particle_system = self.ffi_world.as_mut().CreateParticleSystem(definition);
             let mut ffi_particle_system = Pin::new_unchecked(ffi_particle_system.as_mut().unwrap());
-            let positions = particle_system.get_raw_positions_mut();
+            let positions = particle_system.get_positions_mut();
             let capacity = i32::try_from(positions.capacity()).unwrap();
             let capacity: int32 = int32::from(capacity);
             ffi_particle_system
                 .as_mut()
-                .SetPositionBuffer(positions.as_mut_ptr(), capacity);
+                .SetPositionBuffer(positions.as_mut_ptr() as *mut ffi::b2Vec2, capacity);
             self.particle_system_ptrs
                 .insert(entity, ffi_particle_system);
         }

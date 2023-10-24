@@ -1,11 +1,7 @@
-use std::iter::Map;
-use std::mem;
-use std::slice::Iter;
-
 use bevy::math::Vec2;
 use bevy::prelude::{Component, Entity};
 use libliquidfun_sys::box2d::ffi;
-use libliquidfun_sys::box2d::ffi::{b2Vec2, int32};
+use libliquidfun_sys::box2d::ffi::int32;
 
 use crate::dynamics::b2World;
 
@@ -97,7 +93,7 @@ impl b2ParticleSystemDef {
 #[allow(non_camel_case_types)]
 #[derive(Component, Debug)]
 pub struct b2ParticleSystem {
-    positions: Vec<b2Vec2>,
+    positions: Vec<Vec2>,
     definition: b2ParticleSystemDef,
 }
 
@@ -113,14 +109,11 @@ impl b2ParticleSystem {
         &self.definition
     }
 
-    pub(crate) fn get_raw_positions_mut(&mut self) -> &mut Vec<b2Vec2> {
+    pub(crate) fn get_positions_mut(&mut self) -> &mut Vec<Vec2> {
         &mut self.positions
     }
-    pub fn get_positions(&self) -> Map<Iter<'_, b2Vec2>, fn(&b2Vec2) -> Vec2> {
-        return self
-            .positions
-            .iter()
-            .map(|p| unsafe { mem::transmute_copy::<b2Vec2, Vec2>(p) });
+    pub fn get_positions(&self) -> &Vec<Vec2> {
+        return &self.positions;
     }
 
     pub(crate) fn sync_with_world(&mut self, entity: Entity, b2_world: &b2World) {

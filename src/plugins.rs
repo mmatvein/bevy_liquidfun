@@ -43,7 +43,7 @@ impl Plugin for LiquidFunPlugin {
 }
 
 fn step_physics(mut b2_world: NonSendMut<b2World>) {
-    b2_world.step(0.02, 8, 3, 5);
+    b2_world.step(0.02, 8, 3, 4);
 }
 
 fn create_bodies(
@@ -218,8 +218,8 @@ fn draw_particle_systems(
 ) {
     for (particle_system, _debug_draw) in particle_systems.iter() {
         let radius = particle_system.get_definition().radius;
-        particle_system.get_positions().for_each(|p| {
-            gizmos.circle_2d(p, radius, Color::WHITE);
+        particle_system.get_positions().iter().for_each(|p| {
+            gizmos.circle_2d(*p, radius, Color::WHITE);
         });
     }
 }
