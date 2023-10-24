@@ -4,6 +4,7 @@ use std::pin::Pin;
 use autocxx::WithinBox;
 use bevy::prelude::*;
 use libliquidfun_sys::box2d::ffi::b2BodyType::{b2_dynamicBody, b2_kinematicBody, b2_staticBody};
+use libliquidfun_sys::box2d::ffi::int32;
 use libliquidfun_sys::box2d::*;
 
 use crate::collision::b2Shape;
@@ -33,7 +34,7 @@ pub struct b2World<'a> {
 
 impl<'a> b2World<'a> {
     pub fn new(gravity: Vec2) -> Self {
-        let ffi_gravity = to_b2Vec2(gravity);
+        let ffi_gravity = to_b2Vec2(&gravity);
         let ffi_world = ffi::b2World::new(&ffi_gravity).within_box();
         b2World {
             gravity,
@@ -49,7 +50,7 @@ impl<'a> b2World<'a> {
     pub(crate) fn create_body(&mut self, entity: Entity, body: &mut b2Body) {
         let mut b2body_def = ffi::b2BodyDef::new().within_box();
         b2body_def.type_ = body.body_type.into();
-        b2body_def.position = to_b2Vec2(body.position);
+        b2body_def.position = to_b2Vec2(&body.position);
 
         unsafe {
             let ffi_body = self.ffi_world.as_mut().CreateBody(&*b2body_def);
@@ -126,13 +127,19 @@ impl<'a> b2World<'a> {
     pub(crate) fn create_particle_system(
         &mut self,
         entity: Entity,
-        particle_system: &b2ParticleSystem,
+        particle_system: &mut b2ParticleSystem,
     ) {
         let definition = particle_system.get_definition().to_ffi();
         let definition: *const ffi::b2ParticleSystemDef = &definition;
         unsafe {
             let ffi_particle_system = self.ffi_world.as_mut().CreateParticleSystem(definition);
-            let ffi_particle_system = Pin::new_unchecked(ffi_particle_system.as_mut().unwrap());
+            let mut ffi_particle_system = Pin::new_unchecked(ffi_particle_system.as_mut().unwrap());
+            let positions = particle_system.get_raw_positions_mut();
+            let capacity = i32::try_from(positions.capacity()).unwrap();
+            let capacity: int32 = int32::from(capacity);
+            ffi_particle_system
+                .as_mut()
+                .SetPositionBuffer(positions.as_mut_ptr(), capacity);
             self.particle_system_ptrs
                 .insert(entity, ffi_particle_system);
         }
@@ -244,10 +251,10 @@ impl b2Body {
         let body_ptr = world.body_ptrs.get_mut(&entity).unwrap();
         body_ptr
             .as_mut()
-            .SetTransform(&to_b2Vec2(self.position), self.angle);
+            .SetTransform(&to_b2Vec2(&self.position), self.angle);
         body_ptr
             .as_mut()
-            .SetLinearVelocity(&to_b2Vec2(self.linear_velocity));
+            .SetLinearVelocity(&to_b2Vec2(&self.linear_velocity));
         body_ptr.as_mut().SetAwake(self.awake);
     }
 

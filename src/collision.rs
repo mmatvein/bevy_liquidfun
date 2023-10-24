@@ -59,7 +59,7 @@ impl Default for b2Shape {
 fn circle_to_ffi<'a>(radius: f32, position: Vec2) -> &'a ffi::b2Shape {
     let mut shape = ffi::b2CircleShape::new().within_unique_ptr();
     ffi::SetCircleRadius(shape.pin_mut(), radius);
-    ffi::SetCirclePosition(shape.pin_mut(), &to_b2Vec2(position));
+    ffi::SetCirclePosition(shape.pin_mut(), &to_b2Vec2(&position));
 
     let shape_ptr = shape.into_raw();
     unsafe {
@@ -70,7 +70,9 @@ fn circle_to_ffi<'a>(radius: f32, position: Vec2) -> &'a ffi::b2Shape {
 
 fn edge_to_ffi<'a>(v1: Vec2, v2: Vec2) -> &'a ffi::b2Shape {
     let mut shape = ffi::b2EdgeShape::new().within_unique_ptr();
-    shape.pin_mut().SetTwoSided(&to_b2Vec2(v1), &to_b2Vec2(v2));
+    shape
+        .pin_mut()
+        .SetTwoSided(&to_b2Vec2(&v1), &to_b2Vec2(&v2));
 
     let shape_ptr = shape.into_raw();
     unsafe {
@@ -81,7 +83,7 @@ fn edge_to_ffi<'a>(v1: Vec2, v2: Vec2) -> &'a ffi::b2Shape {
 
 fn polygon_to_ffi<'a>(vertices: &Vec<Vec2>) -> &'a ffi::b2Shape {
     let mut shape = ffi::b2PolygonShape::new().within_unique_ptr();
-    let vertices: Vec<b2Vec2> = vertices.iter().map(|v| to_b2Vec2(*v)).collect();
+    let vertices: Vec<b2Vec2> = vertices.iter().map(|v| to_b2Vec2(v)).collect();
     let count: i32 = vertices.len().try_into().unwrap();
     unsafe {
         shape

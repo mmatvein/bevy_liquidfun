@@ -8,6 +8,12 @@ use bevy::transform::TransformSystem;
 
 pub struct LiquidFunPlugin;
 
+impl Default for LiquidFunPlugin {
+    fn default() -> Self {
+        todo!()
+    }
+}
+
 impl Plugin for LiquidFunPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
@@ -29,6 +35,7 @@ impl Plugin for LiquidFunPlugin {
                 sync_bodies_to_world,
                 step_physics,
                 sync_bodies_from_world,
+                sync_particle_systems_from_world,
                 update_transforms,
             )
                 .chain(),
@@ -119,6 +126,15 @@ fn sync_bodies_from_world(b2_world: NonSend<b2World>, mut bodies: Query<(Entity,
     }
 }
 
+fn sync_particle_systems_from_world(
+    b2_world: NonSend<b2World>,
+    mut particle_systems: Query<(Entity, &mut b2ParticleSystem)>,
+) {
+    for (entity, mut particle_system) in particle_systems.iter_mut() {
+        particle_system.sync_with_world(entity, &b2_world);
+    }
+}
+
 fn update_transforms(mut bodies: Query<(&b2Body, &mut Transform)>) {
     for (body, mut transform) in bodies.iter_mut() {
         transform.translation = body.position.extend(0.);
@@ -198,25 +214,13 @@ fn draw_fixtures(
 }
 
 fn draw_particle_systems(
-    b2_world: NonSend<b2World>,
-    particle_systems: Query<(Entity, &b2ParticleSystem, &DebugDrawParticleSystem)>,
+    particle_systems: Query<(&b2ParticleSystem, &DebugDrawParticleSystem)>,
     mut gizmos: Gizmos,
 ) {
-    for (entity, particle_system, _debug_draw) in particle_systems.iter() {
-        let ptr = b2_world.particle_system_ptrs.get(&entity).unwrap();
-        let positions = ptr.as_ref().GetPositionBuffer1();
-        let count: i32 = ptr.GetParticleCount().into();
-        for i in 0..count {
-            unsafe {
-                let position = positions.offset(i.try_into().unwrap());
-                let position = position.as_ref().unwrap();
-                let position = Vec2::new(position.x, position.y);
-                gizmos.circle_2d(
-                    position,
-                    particle_system.get_definition().radius,
-                    Color::WHITE,
-                );
-            }
-        }
+    for (particle_system, _debug_draw) in particle_systems.iter() {
+        let radius = particle_system.get_definition().radius;
+        particle_system.get_positions().for_each(|p| {
+            gizmos.circle_2d(p, radius, Color::WHITE);
+        });
     }
 }

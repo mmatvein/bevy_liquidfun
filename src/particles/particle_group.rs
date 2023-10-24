@@ -24,9 +24,9 @@ impl b2ParticleGroupDef {
             return ffi::CreateParticleGroupDef(
                 flags,
                 uint32::from(0),
-                to_b2Vec2(Vec2::ZERO),
+                to_b2Vec2(&Vec2::ZERO),
                 0.,
-                to_b2Vec2(Vec2::ZERO),
+                to_b2Vec2(&Vec2::ZERO),
                 0.,
                 1.,
                 ffi_shape,

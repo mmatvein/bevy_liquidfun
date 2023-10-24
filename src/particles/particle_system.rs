@@ -1,6 +1,13 @@
-use bevy::prelude::Component;
+use std::iter::Map;
+use std::mem;
+use std::slice::Iter;
+
+use bevy::math::Vec2;
+use bevy::prelude::{Component, Entity};
 use libliquidfun_sys::box2d::ffi;
-use libliquidfun_sys::box2d::ffi::int32;
+use libliquidfun_sys::box2d::ffi::{b2Vec2, int32};
+
+use crate::dynamics::b2World;
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone)]
@@ -35,7 +42,7 @@ impl Default for b2ParticleSystemDef {
             density: 1.0,
             gravity_scale: 1.0,
             radius: 1.0,
-            max_count: 0,
+            max_count: 5000,
 
             // Initialize physical coefficients to the maximum values that
             // maintain numerical stability.
@@ -90,17 +97,38 @@ impl b2ParticleSystemDef {
 #[allow(non_camel_case_types)]
 #[derive(Component, Debug)]
 pub struct b2ParticleSystem {
+    positions: Vec<b2Vec2>,
     definition: b2ParticleSystemDef,
 }
 
 impl b2ParticleSystem {
     pub fn new(def: &b2ParticleSystemDef) -> b2ParticleSystem {
         b2ParticleSystem {
+            positions: Vec::with_capacity(def.max_count as usize),
             definition: def.clone(),
         }
     }
 
     pub fn get_definition(&self) -> &b2ParticleSystemDef {
         &self.definition
+    }
+
+    pub(crate) fn get_raw_positions_mut(&mut self) -> &mut Vec<b2Vec2> {
+        &mut self.positions
+    }
+    pub fn get_positions(&self) -> Map<Iter<'_, b2Vec2>, fn(&b2Vec2) -> Vec2> {
+        return self
+            .positions
+            .iter()
+            .map(|p| unsafe { mem::transmute_copy::<b2Vec2, Vec2>(p) });
+    }
+
+    pub(crate) fn sync_with_world(&mut self, entity: Entity, b2_world: &b2World) {
+        let particle_system_ptr = b2_world.particle_system_ptrs.get(&entity).unwrap();
+        let particle_count = particle_system_ptr.as_ref().GetParticleCount();
+        let particle_count = usize::try_from(i32::from(particle_count)).unwrap();
+        unsafe {
+            self.positions.set_len(particle_count);
+        }
     }
 }
