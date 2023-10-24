@@ -9,8 +9,7 @@ use libliquidfun_sys::box2d::*;
 
 use crate::collision::b2Shape;
 use crate::internal::*;
-use crate::particles::particle_group::b2ParticleGroup;
-use crate::particles::particle_system::b2ParticleSystem;
+use crate::particles::{b2ParticleGroup, b2ParticleSystem};
 
 #[derive(Debug, Copy, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
 pub struct BodyHandle(u64);

@@ -1,7 +1,6 @@
 use crate::collision::b2Shape;
 use crate::dynamics::{b2Body, b2Fixture, b2World};
-use crate::particles::particle_group::b2ParticleGroup;
-use crate::particles::particle_system::b2ParticleSystem;
+use crate::particles::{b2ParticleGroup, b2ParticleSystem};
 use crate::utils::{DebugDrawFixtures, DebugDrawParticleSystem};
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;

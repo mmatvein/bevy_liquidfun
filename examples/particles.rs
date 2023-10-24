@@ -4,15 +4,14 @@ extern crate bevy_liquidfun;
 use bevy::prelude::*;
 
 use bevy_liquidfun::dynamics::{b2Body, b2Fixture, b2FixtureDef};
-use bevy_liquidfun::particles::particle::b2ParticleFlags;
-use bevy_liquidfun::particles::particle_group::{b2ParticleGroup, b2ParticleGroupDef};
-use bevy_liquidfun::particles::particle_system::b2ParticleSystem;
+use bevy_liquidfun::particles::{
+    b2ParticleFlags, b2ParticleGroup, b2ParticleGroupDef, b2ParticleSystem, b2ParticleSystemDef,
+};
 use bevy_liquidfun::plugins::{LiquidFunDebugDrawPlugin, LiquidFunPlugin};
 use bevy_liquidfun::utils::{DebugDrawFixtures, DebugDrawParticleSystem};
 use bevy_liquidfun::{
     collision::b2Shape,
     dynamics::{b2BodyDef, b2BodyType::Dynamic, b2World},
-    particles::particle_system::b2ParticleSystemDef,
 };
 
 const FIXED_TIMESTEP: f32 = 0.02;
