@@ -15,7 +15,11 @@ const FIXED_TIMESTEP: f32 = 0.02;
 
 fn main() {
     App::new()
-        .add_plugins((DefaultPlugins, LiquidFunPlugin, LiquidFunDebugDrawPlugin))
+        .add_plugins((
+            DefaultPlugins,
+            LiquidFunPlugin::default(),
+            LiquidFunDebugDrawPlugin,
+        ))
         .add_systems(Startup, setup_camera)
         .add_systems(
             Startup,

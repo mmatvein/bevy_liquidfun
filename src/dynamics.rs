@@ -11,11 +11,25 @@ use crate::collision::b2Shape;
 use crate::internal::*;
 use crate::particles::{b2ParticleGroup, b2ParticleSystem};
 
-#[derive(Debug, Copy, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
-pub struct BodyHandle(u64);
+#[allow(non_camel_case_types)]
+#[derive(Resource, Clone)]
+pub struct b2WorldSettings {
+    pub time_step: f32,
+    pub velocity_iterations: i32,
+    pub position_iterations: i32,
+    pub particle_iterations: i32,
+}
 
-#[derive(Debug, Copy, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
-pub struct FixtureHandle(u64);
+impl Default for b2WorldSettings {
+    fn default() -> Self {
+        Self {
+            time_step: 0.02,
+            velocity_iterations: 8,
+            position_iterations: 3,
+            particle_iterations: 4,
+        }
+    }
+}
 
 #[allow(non_camel_case_types)]
 pub struct b2World<'a> {

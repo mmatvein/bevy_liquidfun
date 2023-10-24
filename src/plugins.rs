@@ -1,49 +1,58 @@
 use crate::collision::b2Shape;
-use crate::dynamics::{b2Body, b2Fixture, b2World};
+use crate::dynamics::{b2Body, b2Fixture, b2World, b2WorldSettings};
 use crate::particles::{b2ParticleGroup, b2ParticleSystem};
 use crate::utils::{DebugDrawFixtures, DebugDrawParticleSystem};
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 
-pub struct LiquidFunPlugin;
+#[derive(Default)]
+pub struct LiquidFunPlugin {
+    settings: b2WorldSettings,
+}
 
-impl Default for LiquidFunPlugin {
-    fn default() -> Self {
-        todo!()
+impl LiquidFunPlugin {
+    pub fn new(settings: b2WorldSettings) -> LiquidFunPlugin {
+        LiquidFunPlugin { settings }
     }
 }
 
 impl Plugin for LiquidFunPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            PostUpdate,
-            (
-                create_bodies,
-                create_fixtures,
-                create_particle_systems,
-                create_particle_groups,
-                destroy_removed_fixtures,
-                destroy_removed_bodies,
-                apply_deferred,
+        app.insert_resource(self.settings.clone())
+            .add_systems(
+                PostUpdate,
+                (
+                    create_bodies,
+                    create_fixtures,
+                    create_particle_systems,
+                    create_particle_groups,
+                    destroy_removed_fixtures,
+                    destroy_removed_bodies,
+                    apply_deferred,
+                )
+                    .chain(),
             )
-                .chain(),
-        )
-        .add_systems(
-            FixedUpdate,
-            (
-                sync_bodies_to_world,
-                step_physics,
-                sync_bodies_from_world,
-                sync_particle_systems_from_world,
-                update_transforms,
-            )
-                .chain(),
-        );
+            .add_systems(
+                FixedUpdate,
+                (
+                    sync_bodies_to_world,
+                    step_physics,
+                    sync_bodies_from_world,
+                    sync_particle_systems_from_world,
+                    update_transforms,
+                )
+                    .chain(),
+            );
     }
 }
 
-fn step_physics(mut b2_world: NonSendMut<b2World>) {
-    b2_world.step(0.02, 8, 3, 4);
+fn step_physics(mut b2_world: NonSendMut<b2World>, settings: Res<b2WorldSettings>) {
+    b2_world.step(
+        settings.time_step,
+        settings.velocity_iterations,
+        settings.position_iterations,
+        settings.particle_iterations,
+    );
 }
 
 fn create_bodies(

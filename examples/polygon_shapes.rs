@@ -51,7 +51,11 @@ fn main() {
     ];
 
     App::new()
-        .add_plugins((DefaultPlugins, LiquidFunPlugin, LiquidFunDebugDrawPlugin))
+        .add_plugins((
+            DefaultPlugins,
+            LiquidFunPlugin::default(),
+            LiquidFunDebugDrawPlugin,
+        ))
         .insert_resource(ShapeCollection {
             shapes: available_shapes,
         })
