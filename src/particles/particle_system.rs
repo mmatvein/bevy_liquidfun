@@ -124,9 +124,9 @@ impl b2ParticleSystem {
     }
 
     pub(crate) fn sync_with_world(&mut self, entity: Entity, b2_world: &b2World) {
-        let particle_system_ptr = b2_world.particle_system_ptrs.get(&entity).unwrap();
+        let particle_system_ptr = b2_world.get_particle_system_ptr(&entity).unwrap();
         let particle_count = particle_system_ptr.as_ref().GetParticleCount();
-        let particle_count = usize::try_from(i32::from(particle_count)).unwrap();
+        let particle_count = i32::from(particle_count) as usize;
         unsafe {
             self.positions.set_len(particle_count);
         }

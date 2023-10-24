@@ -24,7 +24,7 @@ pub struct b2World<'a> {
 
     body_ptrs: HashMap<Entity, Pin<&'a mut ffi::b2Body>>,
     fixture_ptrs: HashMap<Entity, Pin<&'a mut ffi::b2Fixture>>,
-    pub(crate) particle_system_ptrs: HashMap<Entity, Pin<&'a mut ffi::b2ParticleSystem>>,
+    particle_system_ptrs: HashMap<Entity, Pin<&'a mut ffi::b2ParticleSystem>>,
 
     body_to_fixtures: HashMap<Entity, HashSet<Entity>>,
     fixture_to_body: HashMap<Entity, Entity>,
@@ -179,6 +179,13 @@ impl<'a> b2World<'a> {
         body_entity: &Entity,
     ) -> Option<&HashSet<Entity>> {
         self.body_to_fixtures.get(body_entity)
+    }
+
+    pub(crate) fn get_particle_system_ptr(
+        &self,
+        particle_system_entity: &Entity,
+    ) -> Option<&Pin<&'a mut ffi::b2ParticleSystem>> {
+        self.particle_system_ptrs.get(particle_system_entity)
     }
 }
 
