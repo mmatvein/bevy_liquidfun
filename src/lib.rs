@@ -1,9 +1,25 @@
 pub mod collision;
-pub mod dynamics;
 pub mod plugins;
 pub mod utils;
 
 pub(crate) mod internal;
+
+pub mod dynamics {
+    mod body;
+    mod joints {
+        mod joint;
+        pub use joint::*;
+        mod revolute_joint;
+        pub use revolute_joint::*;
+    }
+    mod fixture;
+    mod world;
+
+    pub use body::*;
+    pub use fixture::*;
+    pub use joints::*;
+    pub use world::*;
+}
 
 pub mod particles {
     mod particle;

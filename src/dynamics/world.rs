@@ -3,11 +3,10 @@ use std::pin::Pin;
 
 use autocxx::WithinBox;
 use bevy::prelude::*;
-use libliquidfun_sys::box2d::ffi::b2BodyType::{b2_dynamicBody, b2_kinematicBody, b2_staticBody};
 use libliquidfun_sys::box2d::ffi::int32;
 use libliquidfun_sys::box2d::*;
 
-use crate::collision::b2Shape;
+use crate::dynamics::{b2Body, b2Fixture, b2Joint, JointPtr};
 use crate::internal::*;
 use crate::particles::{b2ParticleGroup, b2ParticleSystem};
 
@@ -37,6 +36,7 @@ pub struct b2World<'a> {
 
     body_ptrs: HashMap<Entity, Pin<&'a mut ffi::b2Body>>,
     fixture_ptrs: HashMap<Entity, Pin<&'a mut ffi::b2Fixture>>,
+    joint_ptrs: HashMap<Entity, JointPtr<'a>>,
     particle_system_ptrs: HashMap<Entity, Pin<&'a mut ffi::b2ParticleSystem>>,
 
     body_to_fixtures: HashMap<Entity, HashSet<Entity>>,
@@ -54,10 +54,26 @@ impl<'a> b2World<'a> {
             ffi_world,
             body_ptrs: HashMap::new(),
             fixture_ptrs: HashMap::new(),
+            joint_ptrs: HashMap::new(),
             particle_system_ptrs: HashMap::new(),
             body_to_fixtures: HashMap::new(),
             fixture_to_body: HashMap::new(),
         }
+    }
+
+    pub(crate) fn get_world_ptr(&mut self) -> &mut Pin<Box<ffi::b2World>> {
+        &mut self.ffi_world
+    }
+
+    pub(crate) fn get_body_ptr(&self, entity: Entity) -> Option<&Pin<&'a mut ffi::b2Body>> {
+        self.body_ptrs.get(&entity)
+    }
+
+    pub(crate) fn get_body_ptr_mut(
+        &mut self,
+        entity: Entity,
+    ) -> Option<&mut Pin<&'a mut ffi::b2Body>> {
+        self.body_ptrs.get_mut(&entity)
     }
 
     pub(crate) fn create_body(&mut self, entity: Entity, body: &mut b2Body) {
@@ -111,6 +127,14 @@ impl<'a> b2World<'a> {
         self.fixture_to_body.insert(fixture_entity, body_entity);
     }
 
+    pub(crate) fn register_joint(
+        &mut self,
+        joint: (Entity, &b2Joint, JointPtr<'a>),
+        _body_a: (Entity, &mut b2Body), // TODO
+        _body_b: (Entity, &mut b2Body), // TODO
+    ) {
+        self.joint_ptrs.insert(joint.0, joint.2);
+    }
     pub(crate) fn destroy_fixture_for_entity(&mut self, entity: Entity) {
         let fixture_ptr = self.fixture_ptrs.remove(&entity);
 
@@ -200,165 +224,8 @@ impl<'a> b2World<'a> {
     ) -> Option<&Pin<&'a mut ffi::b2ParticleSystem>> {
         self.particle_system_ptrs.get(particle_system_entity)
     }
-}
 
-#[allow(non_camel_case_types)]
-#[derive(Debug, Default, Copy, Clone)]
-pub enum b2BodyType {
-    #[default]
-    Static,
-    Kinematic,
-    Dynamic,
-}
-
-impl From<ffi::b2BodyType> for b2BodyType {
-    fn from(value: ffi::b2BodyType) -> Self {
-        match value {
-            b2_staticBody => b2BodyType::Static,
-            b2_kinematicBody => b2BodyType::Kinematic,
-            b2_dynamicBody => b2BodyType::Dynamic,
-        }
-    }
-}
-
-impl Into<ffi::b2BodyType> for b2BodyType {
-    fn into(self) -> ffi::b2BodyType {
-        match self {
-            b2BodyType::Static => b2_staticBody,
-            b2BodyType::Kinematic => b2_kinematicBody,
-            b2BodyType::Dynamic => b2_dynamicBody,
-        }
-    }
-}
-
-#[allow(non_camel_case_types)]
-#[derive(Debug, Component)]
-pub struct b2Body {
-    pub(crate) fixtures: HashSet<Entity>,
-
-    pub body_type: b2BodyType,
-    pub position: Vec2,
-    pub angle: f32,
-    pub linear_velocity: Vec2,
-    pub awake: bool,
-
-    mass: f32,
-}
-
-impl b2Body {
-    pub fn new(body_def: &b2BodyDef) -> Self {
-        b2Body {
-            fixtures: HashSet::new(),
-            body_type: body_def.body_type,
-            position: body_def.position,
-            angle: body_def.angle,
-            linear_velocity: Vec2::ZERO,
-            mass: 0.,
-            awake: true,
-        }
-    }
-
-    pub fn sync_with_world(&mut self, entity: Entity, world: &b2World) {
-        let body_ptr = world.body_ptrs.get(&entity).unwrap();
-        self.position = to_Vec2(body_ptr.as_ref().GetPosition());
-        self.angle = body_ptr.as_ref().GetAngle();
-        self.linear_velocity = to_Vec2(body_ptr.as_ref().GetLinearVelocity());
-        self.mass = body_ptr.as_ref().GetMass();
-        self.awake = body_ptr.as_ref().IsAwake();
-    }
-
-    pub fn sync_to_world(&self, entity: Entity, world: &mut b2World) {
-        let body_ptr = world.body_ptrs.get_mut(&entity).unwrap();
-        body_ptr
-            .as_mut()
-            .SetTransform(&to_b2Vec2(&self.position), self.angle);
-        body_ptr
-            .as_mut()
-            .SetLinearVelocity(&to_b2Vec2(&self.linear_velocity));
-        body_ptr.as_mut().SetAwake(self.awake);
-    }
-
-    pub fn get_mass(&self) -> f32 {
-        self.mass
-    }
-}
-
-#[allow(non_camel_case_types)]
-#[derive(Debug, Default)]
-pub struct b2BodyDef {
-    pub body_type: b2BodyType,
-    pub position: Vec2,
-    pub angle: f32,
-}
-
-#[allow(non_camel_case_types)]
-#[derive(Component, Debug)]
-pub struct b2Fixture {
-    body: Entity,
-    shape: b2Shape,
-    density: f32,
-    friction: f32,
-}
-
-impl b2Fixture {
-    pub fn new(body: Entity, fixture_def: &b2FixtureDef) -> Self {
-        b2Fixture {
-            body,
-            shape: fixture_def.shape.clone(),
-            density: fixture_def.density,
-            friction: fixture_def.friction,
-        }
-    }
-
-    pub fn get_body_entity(&self) -> Entity {
-        self.body
-    }
-
-    pub fn get_shape(&self) -> &b2Shape {
-        &self.shape
-    }
-
-    fn extract_fixture_def(&self) -> b2FixtureDef {
-        b2FixtureDef {
-            shape: self.shape.clone(),
-            density: self.density,
-            friction: self.friction,
-        }
-    }
-}
-
-#[allow(non_camel_case_types)]
-#[derive(Debug)]
-pub struct b2FixtureDef {
-    pub shape: b2Shape,
-    pub density: f32,
-    pub friction: f32,
-}
-
-impl b2FixtureDef {
-    pub fn new(shape: b2Shape, density: f32) -> Self {
-        b2FixtureDef {
-            shape,
-            density,
-            ..default()
-        }
-    }
-
-    fn to_ffi(&self) -> Pin<Box<ffi::b2FixtureDef>> {
-        let mut b2fixture_def = ffi::b2FixtureDef::new().within_box();
-        b2fixture_def.density = self.density;
-        b2fixture_def.shape = self.shape.to_ffi();
-
-        return b2fixture_def;
-    }
-}
-
-impl Default for b2FixtureDef {
-    fn default() -> Self {
-        b2FixtureDef {
-            shape: b2Shape::default(),
-            density: 0.,
-            friction: 0.,
-        }
+    pub(crate) fn get_joint_ptr(&mut self, joint_entity: &Entity) -> Option<&mut JointPtr<'a>> {
+        self.joint_ptrs.get_mut(joint_entity)
     }
 }

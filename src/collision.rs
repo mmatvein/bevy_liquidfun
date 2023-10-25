@@ -25,6 +25,18 @@ impl b2Shape {
             ],
         }
     }
+
+    pub fn create_box_with_offset(half_width: f32, half_height: f32, offset: Vec2) -> b2Shape {
+        b2Shape::Polygon {
+            vertices: vec![
+                Vec2::new(-half_width, -half_height) + offset,
+                Vec2::new(half_width, -half_height) + offset,
+                Vec2::new(half_width, half_height) + offset,
+                Vec2::new(-half_width, half_height) + offset,
+            ],
+        }
+    }
+
     pub fn create_regular_polygon(vertex_count: i8, radius: f32, angle: f32) -> b2Shape {
         let angle_step_per_vertex = 2. * PI / f32::from(vertex_count);
         let vertices = (0..vertex_count)
