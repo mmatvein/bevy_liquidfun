@@ -44,6 +44,7 @@ pub struct b2Body {
     pub angle: f32,
     pub linear_velocity: Vec2,
     pub awake: bool,
+    pub allow_sleep: bool,
 
     mass: f32,
 }
@@ -58,6 +59,7 @@ impl b2Body {
             linear_velocity: Vec2::ZERO,
             mass: 0.,
             awake: true,
+            allow_sleep: body_def.allow_sleep,
         }
     }
 
@@ -79,6 +81,7 @@ impl b2Body {
             .as_mut()
             .SetLinearVelocity(&to_b2Vec2(&self.linear_velocity));
         body_ptr.as_mut().SetAwake(self.awake);
+        body_ptr.as_mut().SetSleepingAllowed(self.allow_sleep);
     }
 
     pub fn get_mass(&self) -> f32 {

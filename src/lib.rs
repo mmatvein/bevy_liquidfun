@@ -11,6 +11,9 @@ pub mod dynamics {
         pub use joint::*;
         mod revolute_joint;
         pub use revolute_joint::*;
+
+        mod prismatic_joint;
+        pub use prismatic_joint::*;
     }
     mod fixture;
     mod world;

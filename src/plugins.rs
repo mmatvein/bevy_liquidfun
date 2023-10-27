@@ -1,6 +1,7 @@
 use crate::collision::b2Shape;
 use crate::dynamics::{
-    b2Body, b2Fixture, b2Joint, b2RevoluteJoint, b2World, b2WorldSettings, JointPtr,
+    b2Body, b2Fixture, b2Joint, b2PrismaticJoint, b2RevoluteJoint, b2World, b2WorldSettings,
+    JointPtr,
 };
 use crate::particles::{b2ParticleGroup, b2ParticleSystem};
 use crate::utils::{DebugDrawFixtures, DebugDrawParticleSystem};
@@ -27,6 +28,7 @@ impl Plugin for LiquidFunPlugin {
                     create_bodies,
                     create_fixtures,
                     create_revolute_joints,
+                    create_prismatic_joints,
                     create_particle_systems,
                     create_particle_groups,
                     destroy_removed_fixtures,
@@ -40,6 +42,7 @@ impl Plugin for LiquidFunPlugin {
                 (
                     sync_bodies_to_world,
                     sync_revolute_joints_to_world,
+                    sync_prismatic_joints_to_world,
                     step_physics,
                     sync_bodies_from_world,
                     sync_particle_systems_from_world,
@@ -89,6 +92,29 @@ fn create_revolute_joints(
             .get_many_mut([*joint.body_a(), *joint.body_b()])
             .unwrap();
         let joint_ptr = revolute_joint.create_ffi_joint(
+            &mut b2_world,
+            body_a.0,
+            body_b.0,
+            joint.collide_connected(),
+        );
+        b2_world.register_joint(
+            (joint_entity, &joint, joint_ptr),
+            (body_a.0, &mut body_a.1),
+            (body_b.0, &mut body_b.1),
+        );
+    }
+}
+
+fn create_prismatic_joints(
+    mut b2_world: NonSendMut<b2World>,
+    mut added: Query<(Entity, &b2Joint, &b2PrismaticJoint), Added<b2PrismaticJoint>>,
+    mut bodies: Query<(Entity, &mut b2Body)>,
+) {
+    for (joint_entity, joint, prismatic_joint) in added.iter_mut() {
+        let [mut body_a, mut body_b] = bodies
+            .get_many_mut([*joint.body_a(), *joint.body_b()])
+            .unwrap();
+        let joint_ptr = prismatic_joint.create_ffi_joint(
             &mut b2_world,
             body_a.0,
             body_b.0,
@@ -164,6 +190,18 @@ fn sync_revolute_joints_to_world(
     for (entity, joint) in joints.iter() {
         let joint_ptr = b2_world.get_joint_ptr(&entity).unwrap();
         if let JointPtr::Revolute(joint_ptr) = joint_ptr {
+            joint.sync_to_world(joint_ptr.as_mut());
+        }
+    }
+}
+
+fn sync_prismatic_joints_to_world(
+    mut b2_world: NonSendMut<b2World>,
+    joints: Query<(Entity, &b2PrismaticJoint), Changed<b2PrismaticJoint>>,
+) {
+    for (entity, joint) in joints.iter() {
+        let joint_ptr = b2_world.get_joint_ptr(&entity).unwrap();
+        if let JointPtr::Prismatic(joint_ptr) = joint_ptr {
             joint.sync_to_world(joint_ptr.as_mut());
         }
     }
