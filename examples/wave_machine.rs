@@ -6,7 +6,7 @@ use std::f32::consts::PI;
 use bevy::prelude::*;
 
 use bevy_liquidfun::dynamics::{
-    b2Body, b2Fixture, b2FixtureDef, b2Joint, b2RevoluteJoint, b2RevoluteJointDef,
+    b2Body, b2BodyBundle, b2Fixture, b2FixtureDef, b2Joint, b2RevoluteJoint, b2RevoluteJointDef,
     CreateRevoluteJoint,
 };
 use bevy_liquidfun::particles::{
@@ -60,15 +60,12 @@ fn setup_box(mut commands: Commands) {
     let ground_entity = commands.spawn(b2Body::new(&b2BodyDef::default())).id();
 
     let box_pos = Vec2::new(0., 1.);
-    let debug_draw: DebugDrawFixtures = DebugDrawFixtures::splat(Color::MIDNIGHT_BLUE);
     let box_def = b2BodyDef {
         body_type: Dynamic,
         position: box_pos,
         ..default()
     };
-    let box_entity = commands
-        .spawn((TransformBundle::default(), b2Body::new(&box_def)))
-        .id();
+    let box_entity = commands.spawn(b2BodyBundle::new(&box_def)).id();
 
     let shapes = vec![
         b2Shape::create_box_with_offset(0.05, 1., Vec2::new(2.0, 0.0)),
@@ -79,7 +76,10 @@ fn setup_box(mut commands: Commands) {
 
     shapes.into_iter().for_each(|shape| {
         let fixture_def = b2FixtureDef::new(shape, 5.);
-        commands.spawn((b2Fixture::new(box_entity, &fixture_def), debug_draw.clone()));
+        commands.spawn((
+            b2Fixture::new(box_entity, &fixture_def),
+            DebugDrawFixtures::default_static(),
+        ));
     });
 
     let joint_def = b2RevoluteJointDef {

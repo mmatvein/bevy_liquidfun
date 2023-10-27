@@ -8,7 +8,7 @@ use bevy::input::prelude::*;
 use bevy::prelude::*;
 use rand::prelude::*;
 
-use bevy_liquidfun::dynamics::{b2Body, b2Fixture, b2FixtureDef};
+use bevy_liquidfun::dynamics::{b2BodyBundle, b2Fixture, b2FixtureDef};
 use bevy_liquidfun::plugins::{LiquidFunDebugDrawPlugin, LiquidFunPlugin};
 use bevy_liquidfun::utils::DebugDrawFixtures;
 use bevy_liquidfun::{
@@ -109,11 +109,7 @@ fn setup_physics_world(world: &mut World) {
 
 fn setup_ground(mut commands: Commands) {
     {
-        let body_def = b2BodyDef::default();
-
-        let ground_entity = commands
-            .spawn((TransformBundle::default(), b2Body::new(&body_def)))
-            .id();
+        let ground_entity = commands.spawn(b2BodyBundle::default()).id();
 
         let shape = b2Shape::EdgeTwoSided {
             v1: Vec2::new(-40., 0.),
@@ -122,7 +118,7 @@ fn setup_ground(mut commands: Commands) {
         let fixture_def = b2FixtureDef::new(shape, 0.);
         commands.spawn((
             b2Fixture::new(ground_entity, &fixture_def),
-            DebugDrawFixtures::splat(Color::MIDNIGHT_BLUE),
+            DebugDrawFixtures::default_static(),
         ));
     }
 }
@@ -160,14 +156,7 @@ fn create_body(shape: &b2Shape, mut commands: Commands) {
         ..default()
     };
     let body_entity = commands
-        .spawn((
-            TransformBundle {
-                local: Transform::from_translation(body_def.position.extend(0.)),
-                ..default()
-            },
-            b2Body::new(&body_def),
-            AllowDestroy,
-        ))
+        .spawn((b2BodyBundle::new(&body_def), AllowDestroy))
         .id();
 
     let fixture_def = b2FixtureDef {
@@ -176,16 +165,9 @@ fn create_body(shape: &b2Shape, mut commands: Commands) {
         friction: 0.3,
         ..default()
     };
-
     commands.spawn((
         b2Fixture::new(body_entity, &fixture_def),
-        DebugDrawFixtures {
-            awake_color: Color::GOLD,
-            draw_pivot: true,
-            draw_up_vector: true,
-            draw_right_vector: true,
-            ..default()
-        },
+        DebugDrawFixtures::default_dynamic(),
     ));
 }
 

@@ -1,7 +1,6 @@
 use crate::dynamics::b2World;
 use crate::internal::{to_Vec2, to_b2Vec2};
-use bevy::math::Vec2;
-use bevy::prelude::{Component, Entity};
+use bevy::prelude::*;
 use libliquidfun_sys::box2d::ffi;
 use libliquidfun_sys::box2d::ffi::b2BodyType::{b2_dynamicBody, b2_kinematicBody, b2_staticBody};
 use std::collections::HashSet;
@@ -93,4 +92,34 @@ pub struct b2BodyDef {
     pub body_type: b2BodyType,
     pub position: Vec2,
     pub angle: f32,
+    pub allow_sleep: bool,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Bundle)]
+pub struct b2BodyBundle {
+    pub transform: TransformBundle,
+    pub body: b2Body,
+}
+
+impl b2BodyBundle {
+    pub fn new(def: &b2BodyDef) -> Self {
+        Self {
+            transform: TransformBundle {
+                local: Transform {
+                    translation: def.position.extend(0.),
+                    rotation: Quat::from_rotation_z(def.angle),
+                    ..default()
+                },
+                ..default()
+            },
+            body: b2Body::new(def),
+        }
+    }
+}
+
+impl Default for b2BodyBundle {
+    fn default() -> Self {
+        b2BodyBundle::new(&b2BodyDef::default())
+    }
 }

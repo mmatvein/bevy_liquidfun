@@ -34,6 +34,18 @@ impl DebugDrawFixtures {
             ..default()
         }
     }
+
+    pub fn default_static() -> Self {
+        Self::splat(Color::MIDNIGHT_BLUE)
+    }
+    pub fn default_dynamic() -> Self {
+        Self {
+            awake_color: Color::ORANGE,
+            draw_up_vector: true,
+            draw_right_vector: true,
+            ..default()
+        }
+    }
 }
 
 #[derive(Component, Debug)]

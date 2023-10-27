@@ -3,7 +3,7 @@ extern crate bevy_liquidfun;
 
 use bevy::prelude::*;
 
-use bevy_liquidfun::dynamics::{b2Body, b2Fixture, b2FixtureDef};
+use bevy_liquidfun::dynamics::{b2BodyBundle, b2Fixture, b2FixtureDef};
 use bevy_liquidfun::particles::{
     b2ParticleFlags, b2ParticleGroup, b2ParticleGroupDef, b2ParticleSystem, b2ParticleSystemDef,
 };
@@ -58,13 +58,7 @@ fn setup_physics_world(world: &mut World) {
 
 fn setup_ground(mut commands: Commands) {
     {
-        let debug_draw: DebugDrawFixtures = DebugDrawFixtures::splat(Color::MIDNIGHT_BLUE);
-        let ground_entity = commands
-            .spawn((
-                TransformBundle::default(),
-                b2Body::new(&b2BodyDef::default()),
-            ))
-            .id();
+        let ground_entity = commands.spawn(b2BodyBundle::default()).id();
 
         {
             let shape = b2Shape::Polygon {
@@ -79,7 +73,7 @@ fn setup_ground(mut commands: Commands) {
             let fixture_def = b2FixtureDef::new(shape, 0.);
             commands.spawn((
                 b2Fixture::new(ground_entity, &fixture_def),
-                debug_draw.clone(),
+                DebugDrawFixtures::default_static(),
             ));
         }
 
@@ -95,7 +89,7 @@ fn setup_ground(mut commands: Commands) {
             let fixture_def = b2FixtureDef::new(shape, 0.);
             commands.spawn((
                 b2Fixture::new(ground_entity, &fixture_def),
-                debug_draw.clone(),
+                DebugDrawFixtures::default_static(),
             ));
         }
 
@@ -111,7 +105,7 @@ fn setup_ground(mut commands: Commands) {
             let fixture_def = b2FixtureDef::new(shape, 0.);
             commands.spawn((
                 b2Fixture::new(ground_entity, &fixture_def),
-                debug_draw.clone(),
+                DebugDrawFixtures::default_static(),
             ));
         }
     }
@@ -123,8 +117,7 @@ fn setup_circle(mut commands: Commands) {
         position: Vec2::new(0., 8.),
         ..default()
     };
-    let body = b2Body::new(&body_def);
-    let body_entity = commands.spawn((TransformBundle::default(), body)).id();
+    let body_entity = commands.spawn(b2BodyBundle::new(&body_def)).id();
 
     let circle_shape = b2Shape::Circle {
         radius: 0.5,
@@ -133,12 +126,7 @@ fn setup_circle(mut commands: Commands) {
     let fixture_def = b2FixtureDef::new(circle_shape, 0.5);
     commands.spawn((
         b2Fixture::new(body_entity, &fixture_def),
-        DebugDrawFixtures {
-            awake_color: Color::ORANGE,
-            draw_up_vector: true,
-            draw_right_vector: true,
-            ..default()
-        },
+        DebugDrawFixtures::default_dynamic(),
     ));
 }
 
