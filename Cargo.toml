@@ -2,6 +2,13 @@
 name = "bevy_liquidfun"
 version = "0.1.0"
 edition = "2021"
+authors = ["Mikael Matveinen <mikael@lingongames.com>"]
+homepage = "https://github.com/mmatvein/bevy_liquidfun"
+repository = "https://github.com/mmatvein/bevy_liquidfun"
+description = "A Bevy friendly wrapper of Box2D and LiquidFun."
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["liquidfun", "box2d", "physics", "bevy"]
 
 [dependencies]
 autocxx = "0.26.0"
