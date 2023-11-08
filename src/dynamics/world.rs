@@ -80,6 +80,7 @@ impl<'a> b2World<'a> {
         let mut b2body_def = ffi::b2BodyDef::new().within_box();
         b2body_def.type_ = body.body_type.into();
         b2body_def.position = to_b2Vec2(&body.position);
+        b2body_def.fixedRotation = body.fixed_rotation;
 
         unsafe {
             let ffi_body = self.ffi_world.as_mut().CreateBody(&*b2body_def);

@@ -45,6 +45,7 @@ pub struct b2Body {
     pub linear_velocity: Vec2,
     pub awake: bool,
     pub allow_sleep: bool,
+    pub fixed_rotation: bool,
 
     mass: f32,
 }
@@ -60,6 +61,7 @@ impl b2Body {
             mass: 0.,
             awake: true,
             allow_sleep: body_def.allow_sleep,
+            fixed_rotation: body_def.fixed_rotation
         }
     }
 
@@ -87,6 +89,18 @@ impl b2Body {
     pub fn get_mass(&self) -> f32 {
         self.mass
     }
+
+    pub fn apply_force(&self, entity: Entity, world: &mut b2World, force: Vec2) {
+        let option = world.get_body_ptr_mut(entity);
+
+        // the body might not yet be created
+        if option.is_none() {
+            return;
+        }
+
+        let body_ptr = option.unwrap();
+        body_ptr.as_mut().ApplyForce(&to_b2Vec2(&force), &to_b2Vec2(&force), true);
+    }
 }
 
 #[allow(non_camel_case_types)]
@@ -96,6 +110,7 @@ pub struct b2BodyDef {
     pub position: Vec2,
     pub angle: f32,
     pub allow_sleep: bool,
+    pub fixed_rotation: bool,
 }
 
 #[allow(non_camel_case_types)]
