@@ -154,7 +154,7 @@ fn destroy_removed_bodies(
     mut removed: RemovedComponents<b2Body>,
     mut commands: Commands,
 ) {
-    for entity in removed.iter() {
+    for entity in removed.read() {
         let fixture_entities = b2_world.get_fixtures_attached_to_entity(&entity);
         if let Some(fixture_entities) = fixture_entities {
             fixture_entities.iter().for_each(|fixture_entity| {
@@ -170,7 +170,7 @@ fn destroy_removed_fixtures(
     mut b2_world: NonSendMut<b2World>,
     mut removed: RemovedComponents<b2Fixture>,
 ) {
-    for entity in removed.iter() {
+    for entity in removed.read() {
         b2_world.destroy_fixture_for_entity(entity);
     }
 }
