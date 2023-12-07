@@ -1,12 +1,15 @@
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
+use std::rc::Rc;
+use std::sync::Arc;
 
 use autocxx::WithinBox;
 use bevy::prelude::*;
-use libliquidfun_sys::box2d::ffi::int32;
+use libliquidfun_sys::box2d::ffi::{b2RayCastCallbackWrapper, int32};
 use libliquidfun_sys::box2d::*;
 
-use crate::dynamics::{b2Body, b2Fixture, b2Joint, JointPtr};
+use crate::dynamics::{b2Body, b2Fixture, b2Joint, b2RayCast, b2RayCastCallback, JointPtr};
 use crate::internal::*;
 use crate::particles::{b2ParticleGroup, b2ParticleSystem};
 
@@ -44,6 +47,8 @@ pub struct b2World<'a> {
 
     pub gravity: Vec2,
 }
+
+impl<'a> b2World<'a> {}
 
 impl<'a> b2World<'a> {
     pub fn new(gravity: Vec2) -> Self {
@@ -114,11 +119,16 @@ impl<'a> b2World<'a> {
         let (body_entity, body_component) = body;
 
         let mut body_ptr = self.body_ptrs.get_mut(&body_entity).unwrap().as_mut();
-        let b2fixture_def = fixture_component.extract_fixture_def().to_ffi();
+        let mut b2fixture_def = fixture_component.extract_fixture_def().to_ffi();
+        b2fixture_def.as_mut().userData.pointer = std::ptr::addr_of!(fixture_entity) as usize;
 
         unsafe {
-            let ffi_fixture = body_ptr.as_mut().CreateFixture(&*b2fixture_def);
-            let ffi_fixture = Pin::new_unchecked(ffi_fixture.as_mut().unwrap());
+            let ffi_fixture = body_ptr
+                .as_mut()
+                .CreateFixture(&*b2fixture_def)
+                .as_mut()
+                .unwrap();
+            let ffi_fixture = Pin::new_unchecked(ffi_fixture);
             self.fixture_ptrs.insert(fixture_entity, ffi_fixture);
         }
 
@@ -156,9 +166,8 @@ impl<'a> b2World<'a> {
         let body_ptr = self.body_ptrs.get_mut(&body_entity).unwrap();
 
         unsafe {
-            body_ptr
-                .as_mut()
-                .DestroyFixture(fixture_ptr.get_unchecked_mut());
+            let fixture_ptr = fixture_ptr.get_unchecked_mut();
+            body_ptr.as_mut().DestroyFixture(fixture_ptr);
         }
     }
 
@@ -228,5 +237,27 @@ impl<'a> b2World<'a> {
 
     pub(crate) fn get_joint_ptr(&mut self, joint_entity: &Entity) -> Option<&mut JointPtr<'a>> {
         self.joint_ptrs.get_mut(joint_entity)
+    }
+
+    pub fn ray_cast(
+        &mut self,
+        callback: Rc<RefCell<dyn b2RayCastCallback>>,
+        start: &Vec2,
+        end: &Vec2,
+    ) {
+        let ray_cast_wrapper = b2RayCast::new(callback);
+        let ray_cast_wrapper = Arc::new(RefCell::new(ray_cast_wrapper));
+        let ray_cast_callback_wrapper = b2RayCastCallbackWrapper::new(ray_cast_wrapper.clone());
+        unsafe {
+            let ffi_callback: *mut ffi::b2RayCastCallback = ray_cast_callback_wrapper
+                .as_ref()
+                .borrow_mut()
+                .pin_mut()
+                .as_mut()
+                .get_unchecked_mut();
+            self.ffi_world
+                .as_mut()
+                .RayCast(ffi_callback, &to_b2Vec2(start), &to_b2Vec2(end));
+        }
     }
 }
