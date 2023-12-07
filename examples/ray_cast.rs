@@ -2,9 +2,7 @@ extern crate bevy;
 extern crate bevy_liquidfun;
 extern crate rand;
 
-use std::cell::RefCell;
 use std::f32::consts::PI;
-use std::rc::Rc;
 
 use bevy::input::prelude::*;
 use bevy::prelude::*;
@@ -199,14 +197,11 @@ fn cast_ray(mut gizmos: Gizmos, time: Res<Time>, mut b2_world: NonSendMut<b2Worl
     const RAY_LENGTH: f32 = 11.;
     let ray_end = ray_start + Vec2::new(RAY_LENGTH * f32::cos(angle), RAY_LENGTH * f32::sin(angle));
     gizmos.line_2d(ray_start, ray_end, Color::WHITE);
-    let ray_cast = Rc::new(RefCell::new(b2RayCastClosest::new()));
-    b2_world.ray_cast(ray_cast.clone(), &ray_start, &ray_end);
-    let ray_cast_result = ray_cast.borrow();
-    if ray_cast_result.entity != Entity::PLACEHOLDER {
-        gizmos.line_2d(
-            ray_cast_result.point,
-            ray_cast_result.point + ray_cast_result.normal,
-            Color::ORANGE_RED,
-        );
+
+    let hit = b2_world.ray_cast(b2RayCastClosest::new(), &ray_start, &ray_end);
+    if let Some(hit) = hit {
+        if hit.entity != Entity::PLACEHOLDER {
+            gizmos.line_2d(hit.point, hit.point + hit.normal, Color::ORANGE_RED);
+        }
     }
 }

@@ -1,6 +1,5 @@
-use std::cell::RefCell;
+use std::fmt::Debug;
 use std::pin::Pin;
-use std::rc::Rc;
 
 use bevy::prelude::{Entity, Vec2};
 
@@ -9,19 +8,24 @@ use libliquidfun_sys::box2d::ffi::{b2ParticleSystem, b2RayCastCallbackImpl, b2Ve
 
 use crate::internal::to_Vec2;
 
+#[derive(Debug)]
 #[allow(non_camel_case_types)]
-pub struct b2RayCast {
-    callback: Rc<RefCell<dyn b2RayCastCallback>>,
+pub(crate) struct b2RayCast<T: b2RayCastCallback> {
+    callback: T,
 }
 
-impl b2RayCast {
-    pub fn new(callback: Rc<RefCell<dyn b2RayCastCallback>>) -> Self {
+impl<T: b2RayCastCallback> b2RayCast<T> {
+    pub fn new(callback: T) -> Self {
         Self { callback }
+    }
+
+    pub fn extract_hits(self) -> T::Result {
+        self.callback.into_result()
     }
 }
 
 #[allow(unused_variables)]
-impl b2RayCastCallbackImpl for b2RayCast {
+impl<T: b2RayCastCallback> b2RayCastCallbackImpl for b2RayCast<T> {
     fn report_fixture(
         &mut self,
         fixture: &mut ffi_b2Fixture,
@@ -29,17 +33,16 @@ impl b2RayCastCallbackImpl for b2RayCast {
         normal: &b2Vec2,
         fraction: f32,
     ) -> f32 {
-        let mut ffi_fixture = unsafe { Pin::new_unchecked(fixture) };
-        let user_data = ffi_fixture.as_mut().GetUserData();
-        let pointer_to_entity_bits = unsafe { user_data.get_unchecked_mut().pointer };
-        let entity = unsafe { *(pointer_to_entity_bits as *const Entity) };
+        let entity = unsafe {
+            let mut ffi_fixture = Pin::new_unchecked(fixture);
+            let user_data = ffi_fixture.as_mut().GetUserData();
+            let pointer_to_entity_bits = user_data.get_unchecked_mut().pointer;
+            *(pointer_to_entity_bits as *const Entity)
+        };
 
-        return self.callback.borrow_mut().report_fixture(
-            entity,
-            &to_Vec2(point),
-            &to_Vec2(normal),
-            fraction,
-        );
+        return self
+            .callback
+            .report_fixture(entity, &to_Vec2(point), &to_Vec2(normal), fraction);
     }
 
     fn report_particle(
@@ -59,29 +62,30 @@ impl b2RayCastCallbackImpl for b2RayCast {
 }
 
 #[allow(non_camel_case_types)]
-pub trait b2RayCastCallback {
+pub trait b2RayCastCallback: Debug {
+    type Result;
+
     fn report_fixture(&mut self, entity: Entity, point: &Vec2, normal: &Vec2, fraction: f32)
         -> f32;
+
+    fn into_result(self) -> Self::Result;
 }
 
+#[derive(Debug)]
 #[allow(non_camel_case_types)]
 pub struct b2RayCastClosest {
-    pub entity: Entity,
-    pub point: Vec2,
-    pub normal: Vec2,
+    result: Option<b2RayCastHit>,
 }
 
 impl b2RayCastClosest {
     pub fn new() -> Self {
-        b2RayCastClosest {
-            entity: Entity::PLACEHOLDER,
-            point: Vec2::ZERO,
-            normal: Vec2::ZERO,
-        }
+        b2RayCastClosest { result: None }
     }
 }
 
 impl b2RayCastCallback for b2RayCastClosest {
+    type Result = Option<b2RayCastHit>;
+
     fn report_fixture(
         &mut self,
         entity: Entity,
@@ -89,9 +93,23 @@ impl b2RayCastCallback for b2RayCastClosest {
         normal: &Vec2,
         fraction: f32,
     ) -> f32 {
-        self.entity = entity;
-        self.point = *point;
-        self.normal = *normal;
+        self.result = Some(b2RayCastHit {
+            entity,
+            point: *point,
+            normal: *normal,
+        });
         fraction
     }
+
+    fn into_result(self) -> Self::Result {
+        self.result
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+#[allow(non_camel_case_types)]
+pub struct b2RayCastHit {
+    pub entity: Entity,
+    pub point: Vec2,
+    pub normal: Vec2,
 }

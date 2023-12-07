@@ -1,11 +1,11 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use autocxx::WithinBox;
 use bevy::prelude::*;
+
 use libliquidfun_sys::box2d::ffi::{b2RayCastCallbackWrapper, int32};
 use libliquidfun_sys::box2d::*;
 
@@ -239,12 +239,12 @@ impl<'a> b2World<'a> {
         self.joint_ptrs.get_mut(joint_entity)
     }
 
-    pub fn ray_cast(
+    pub fn ray_cast<T: b2RayCastCallback + 'static>(
         &mut self,
-        callback: Rc<RefCell<dyn b2RayCastCallback>>,
+        callback: T,
         start: &Vec2,
         end: &Vec2,
-    ) {
+    ) -> T::Result {
         let ray_cast_wrapper = b2RayCast::new(callback);
         let ray_cast_wrapper = Arc::new(RefCell::new(ray_cast_wrapper));
         let ray_cast_callback_wrapper = b2RayCastCallbackWrapper::new(ray_cast_wrapper.clone());
@@ -259,5 +259,9 @@ impl<'a> b2World<'a> {
                 .as_mut()
                 .RayCast(ffi_callback, &to_b2Vec2(start), &to_b2Vec2(end));
         }
+        Arc::try_unwrap(ray_cast_wrapper)
+            .unwrap()
+            .into_inner()
+            .extract_hits()
     }
 }
