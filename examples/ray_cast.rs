@@ -8,7 +8,9 @@ use bevy::input::prelude::*;
 use bevy::prelude::*;
 use rand::prelude::*;
 
-use bevy_liquidfun::dynamics::{b2BodyBundle, b2Fixture, b2FixtureDef, b2RayCastClosest};
+use bevy_liquidfun::dynamics::{
+    b2BodyBundle, b2Fixture, b2FixtureDef, b2RayCastAll, b2RayCastAny, b2RayCastClosest,
+};
 use bevy_liquidfun::plugins::{LiquidFunDebugDrawPlugin, LiquidFunPlugin};
 use bevy_liquidfun::utils::DebugDrawFixtures;
 use bevy_liquidfun::{
@@ -25,6 +27,13 @@ struct ShapeCollection {
 
 #[derive(Component)]
 struct AllowDestroy;
+
+#[derive(Resource, Debug)]
+enum RayCastMode {
+    Closest,
+    Any,
+    All,
+}
 
 fn main() {
     let available_shapes = vec![
@@ -66,9 +75,16 @@ fn main() {
         )
         .add_systems(
             Update,
-            (check_create_body_keys, check_delete_body_key, cast_ray),
+            (
+                check_create_body_keys,
+                check_delete_body_key,
+                check_switch_ray_cast_mode_key,
+                update_instructions,
+                cast_ray,
+            ),
         )
         .insert_resource(Time::<Fixed>::from_seconds(FIXED_TIMESTEP))
+        .insert_resource(RayCastMode::Closest)
         .run();
 }
 
@@ -88,7 +104,7 @@ fn setup_camera(mut commands: Commands) {
 fn setup_instructions(mut commands: Commands) {
     commands.spawn(
         TextBundle::from_section(
-            "'1-5' Spawn a new body\n'd' Delete a body",
+            "",
             TextStyle {
                 font_size: 20.0,
                 color: Color::WHITE,
@@ -102,6 +118,22 @@ fn setup_instructions(mut commands: Commands) {
             ..default()
         }),
     );
+}
+
+fn update_instructions(mode: Res<RayCastMode>, mut text: Query<&mut Text>) {
+    if mode.is_added() || mode.is_changed() {
+        let mut text = text.single_mut();
+        let instruction_text =
+            format!("'1-5' Spawn a new body\n'd' Delete a body\n'r' Change ray cast mode\nCurrent mode: {:?}", mode.as_ref());
+        *text = Text::from_section(
+            instruction_text,
+            TextStyle {
+                font_size: 20.0,
+                color: Color::WHITE,
+                ..default()
+            },
+        );
+    }
 }
 
 fn setup_physics_world(world: &mut World) {
@@ -191,17 +223,49 @@ fn check_delete_body_key(
     }
 }
 
-fn cast_ray(mut gizmos: Gizmos, time: Res<Time>, mut b2_world: NonSendMut<b2World>) {
+fn cast_ray(
+    mut gizmos: Gizmos,
+    time: Res<Time>,
+    mut b2_world: NonSendMut<b2World>,
+    mode: Res<RayCastMode>,
+) {
     let ray_start = Vec2::new(0., 10.);
     let angle = time.elapsed_seconds() / PI;
     const RAY_LENGTH: f32 = 11.;
     let ray_end = ray_start + Vec2::new(RAY_LENGTH * f32::cos(angle), RAY_LENGTH * f32::sin(angle));
     gizmos.line_2d(ray_start, ray_end, Color::WHITE);
 
-    let hit = b2_world.ray_cast(b2RayCastClosest::new(), &ray_start, &ray_end);
-    if let Some(hit) = hit {
-        if hit.entity != Entity::PLACEHOLDER {
-            gizmos.line_2d(hit.point, hit.point + hit.normal, Color::ORANGE_RED);
+    match mode.as_ref() {
+        RayCastMode::Closest => {
+            let callback = b2RayCastClosest::new();
+            let hit = b2_world.ray_cast(callback, &ray_start, &ray_end);
+            if let Some(hit) = hit {
+                gizmos.line_2d(hit.point, hit.point + hit.normal, Color::ORANGE_RED);
+            }
         }
+        RayCastMode::Any => {
+            let callback = b2RayCastAny::new();
+            let hit = b2_world.ray_cast(callback, &ray_start, &ray_end);
+            if let Some(hit) = hit {
+                gizmos.line_2d(hit.point, hit.point + hit.normal, Color::ORANGE_RED);
+            }
+        }
+        RayCastMode::All => {
+            let callback = b2RayCastAll::new();
+            let hits = b2_world.ray_cast(callback, &ray_start, &ray_end);
+            for hit in hits {
+                gizmos.line_2d(hit.point, hit.point + hit.normal, Color::ORANGE_RED);
+            }
+        }
+    };
+}
+
+fn check_switch_ray_cast_mode_key(key_input: Res<Input<KeyCode>>, mut mode: ResMut<RayCastMode>) {
+    if key_input.just_pressed(KeyCode::R) {
+        *mode = match mode.as_ref() {
+            RayCastMode::Closest => RayCastMode::Any,
+            RayCastMode::Any => RayCastMode::All,
+            RayCastMode::All => RayCastMode::Closest,
+        };
     }
 }

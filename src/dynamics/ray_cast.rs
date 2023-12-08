@@ -106,6 +106,75 @@ impl b2RayCastCallback for b2RayCastClosest {
     }
 }
 
+#[derive(Debug)]
+#[allow(non_camel_case_types)]
+pub struct b2RayCastAny {
+    result: Option<b2RayCastHit>,
+}
+
+impl b2RayCastAny {
+    pub fn new() -> Self {
+        b2RayCastAny { result: None }
+    }
+}
+
+impl b2RayCastCallback for b2RayCastAny {
+    type Result = Option<b2RayCastHit>;
+
+    fn report_fixture(
+        &mut self,
+        entity: Entity,
+        point: &Vec2,
+        normal: &Vec2,
+        _fraction: f32,
+    ) -> f32 {
+        self.result = Some(b2RayCastHit {
+            entity,
+            point: *point,
+            normal: *normal,
+        });
+        0.
+    }
+
+    fn into_result(self) -> Self::Result {
+        self.result
+    }
+}
+
+#[derive(Debug)]
+#[allow(non_camel_case_types)]
+pub struct b2RayCastAll {
+    result: Vec<b2RayCastHit>,
+}
+
+impl b2RayCastAll {
+    pub fn new() -> Self {
+        b2RayCastAll { result: Vec::new() }
+    }
+}
+
+impl b2RayCastCallback for b2RayCastAll {
+    type Result = Vec<b2RayCastHit>;
+
+    fn report_fixture(
+        &mut self,
+        entity: Entity,
+        point: &Vec2,
+        normal: &Vec2,
+        _fraction: f32,
+    ) -> f32 {
+        self.result.push(b2RayCastHit {
+            entity,
+            point: *point,
+            normal: *normal,
+        });
+        1.
+    }
+
+    fn into_result(self) -> Self::Result {
+        self.result
+    }
+}
 #[derive(Debug, Copy, Clone)]
 #[allow(non_camel_case_types)]
 pub struct b2RayCastHit {
