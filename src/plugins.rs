@@ -1,8 +1,9 @@
 use crate::collision::b2Shape;
 use crate::dynamics::{
     b2Body, b2Fixture, b2Joint, b2PrismaticJoint, b2RevoluteJoint, b2World, b2WorldSettings,
-    JointPtr,
+    ExternalForce, JointPtr,
 };
+use crate::internal::to_b2Vec2;
 use crate::particles::{b2ParticleGroup, b2ParticleSystem};
 use crate::utils::{DebugDrawFixtures, DebugDrawParticleSystem};
 use bevy::prelude::*;
@@ -23,6 +24,7 @@ impl Plugin for LiquidFunPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(self.settings.clone())
             .insert_resource(PhysicsTimeAccumulator(0.))
+            .add_systems(PreUpdate, clear_forces)
             .add_systems(
                 PostUpdate,
                 (
@@ -38,6 +40,7 @@ impl Plugin for LiquidFunPlugin {
                     sync_bodies_to_world,
                     sync_revolute_joints_to_world,
                     sync_prismatic_joints_to_world,
+                    apply_forces,
                     step_physics,
                     sync_bodies_from_world,
                     sync_particle_systems_from_world,
@@ -70,6 +73,11 @@ fn step_physics(
     }
 }
 
+fn clear_forces(mut external_forces: Query<&mut ExternalForce>) {
+    for mut force in external_forces.iter_mut() {
+        force.clear()
+    }
+}
 fn create_bodies(
     mut b2_world: NonSendMut<b2World>,
     mut added: Query<(Entity, &mut b2Body), Added<b2Body>>,
@@ -212,6 +220,22 @@ fn sync_prismatic_joints_to_world(
         if let JointPtr::Prismatic(joint_ptr) = joint_ptr {
             joint.sync_to_world(joint_ptr.as_mut());
         }
+    }
+}
+
+fn apply_forces(
+    mut b2_world: NonSendMut<b2World>,
+    external_forces: Query<(Entity, &ExternalForce)>,
+) {
+    for (entity, external_force) in external_forces.iter() {
+        let body_ptr = b2_world.get_body_ptr_mut(entity).unwrap();
+        body_ptr.as_mut().ApplyForceToCenter(
+            &to_b2Vec2(&external_force.force()),
+            external_force.should_wake,
+        );
+        body_ptr
+            .as_mut()
+            .ApplyTorque(external_force.torque(), false);
     }
 }
 

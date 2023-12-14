@@ -93,20 +93,6 @@ impl b2Body {
     pub fn get_mass(&self) -> f32 {
         self.mass
     }
-
-    pub fn apply_force(&self, entity: Entity, world: &mut b2World, force: Vec2) {
-        let option = world.get_body_ptr_mut(entity);
-
-        // the body might not yet be created
-        if option.is_none() {
-            return;
-        }
-
-        let body_ptr = option.unwrap();
-        body_ptr
-            .as_mut()
-            .ApplyForce(&to_b2Vec2(&force), &to_b2Vec2(&force), true);
-    }
 }
 
 #[allow(non_camel_case_types)]
@@ -145,5 +131,58 @@ impl b2BodyBundle {
 impl Default for b2BodyBundle {
     fn default() -> Self {
         b2BodyBundle::new(&b2BodyDef::default())
+    }
+}
+
+#[derive(Component, Debug, Default)]
+pub struct ExternalForce {
+    force: Vec2,
+    pub should_wake: bool,
+    torque: f32,
+}
+
+impl ExternalForce {
+    pub const ZERO: Self = Self {
+        force: Vec2::ZERO,
+        should_wake: false,
+        torque: 0.,
+    };
+
+    pub fn new(force: Vec2) -> Self {
+        Self { force, ..default() }
+    }
+
+    pub fn set_force(&mut self, force: Vec2) -> &mut Self {
+        self.force = force;
+        self
+    }
+
+    pub fn apply_force(&mut self, force: Vec2) -> &mut Self {
+        self.force += force;
+        self
+    }
+
+    pub fn apply_force_at_point(
+        &mut self,
+        force: Vec2,
+        point: Vec2,
+        center_of_mass: Vec2,
+    ) -> &mut Self {
+        self.force += force;
+        self.torque += (point - center_of_mass).perp_dot(force);
+        self
+    }
+
+    pub fn force(&self) -> Vec2 {
+        self.force
+    }
+
+    pub fn torque(&self) -> f32 {
+        self.torque
+    }
+
+    pub fn clear(&mut self) {
+        self.force = Vec2::ZERO;
+        self.torque = 0.;
     }
 }
