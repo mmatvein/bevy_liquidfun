@@ -57,7 +57,7 @@ impl<T: b2RayCastCallback> b2RayCastCallbackImpl for b2RayCast<T> {
     }
 
     fn should_query_particle_system(&mut self, particle_system: *const b2ParticleSystem) -> bool {
-        todo!()
+        false
     }
 }
 
