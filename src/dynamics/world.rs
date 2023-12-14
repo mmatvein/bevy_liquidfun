@@ -25,7 +25,7 @@ pub struct b2WorldSettings {
 impl Default for b2WorldSettings {
     fn default() -> Self {
         Self {
-            time_step: 0.02,
+            time_step: 1. / 60.,
             velocity_iterations: 8,
             position_iterations: 3,
             particle_iterations: 4,

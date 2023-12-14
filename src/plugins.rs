@@ -22,6 +22,7 @@ impl LiquidFunPlugin {
 impl Plugin for LiquidFunPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(self.settings.clone())
+            .insert_resource(PhysicsTimeAccumulator(0.))
             .add_systems(
                 PostUpdate,
                 (
@@ -34,12 +35,6 @@ impl Plugin for LiquidFunPlugin {
                     destroy_removed_fixtures,
                     destroy_removed_bodies,
                     apply_deferred,
-                )
-                    .chain(),
-            )
-            .add_systems(
-                FixedUpdate,
-                (
                     sync_bodies_to_world,
                     sync_revolute_joints_to_world,
                     sync_prismatic_joints_to_world,
@@ -53,13 +48,26 @@ impl Plugin for LiquidFunPlugin {
     }
 }
 
-fn step_physics(mut b2_world: NonSendMut<b2World>, settings: Res<b2WorldSettings>) {
-    b2_world.step(
-        settings.time_step,
-        settings.velocity_iterations,
-        settings.position_iterations,
-        settings.particle_iterations,
-    );
+#[derive(Resource)]
+struct PhysicsTimeAccumulator(f32);
+
+fn step_physics(
+    mut b2_world: NonSendMut<b2World>,
+    settings: Res<b2WorldSettings>,
+    time: Res<Time>,
+    mut physics_time_accumulator: ResMut<PhysicsTimeAccumulator>,
+) {
+    physics_time_accumulator.0 += time.delta_seconds();
+
+    while physics_time_accumulator.0 >= settings.time_step {
+        b2_world.step(
+            settings.time_step,
+            settings.velocity_iterations,
+            settings.position_iterations,
+            settings.particle_iterations,
+        );
+        physics_time_accumulator.0 -= settings.time_step;
+    }
 }
 
 fn create_bodies(
@@ -222,10 +230,16 @@ fn sync_particle_systems_from_world(
     }
 }
 
-fn update_transforms(mut bodies: Query<(&b2Body, &mut Transform)>) {
+fn update_transforms(
+    mut bodies: Query<(&b2Body, &mut Transform)>,
+    physics_time_accumulator: Res<PhysicsTimeAccumulator>,
+) {
+    let extrapolation_time = physics_time_accumulator.0;
     for (body, mut transform) in bodies.iter_mut() {
-        transform.translation = body.position.extend(0.);
-        transform.rotation = Quat::from_rotation_z(body.angle);
+        let extrapolated_position = body.position + body.linear_velocity * extrapolation_time;
+        transform.translation = extrapolated_position.extend(0.);
+        let extrapolated_rotation = body.angle + body.angular_velocity * extrapolation_time;
+        transform.rotation = Quat::from_rotation_z(extrapolated_rotation);
     }
 }
 pub struct LiquidFunDebugDrawPlugin;

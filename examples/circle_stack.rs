@@ -10,9 +10,6 @@ use bevy_liquidfun::{
     collision::b2Shape,
     dynamics::{b2BodyDef, b2BodyType::Dynamic, b2World},
 };
-
-const FIXED_TIMESTEP: f64 = 0.02;
-
 fn main() {
     App::new()
         .add_plugins((
@@ -28,7 +25,6 @@ fn main() {
                 setup_physics_bodies.after(setup_physics_world),
             ),
         )
-        .insert_resource(Time::<Fixed>::from_seconds(FIXED_TIMESTEP))
         .run();
 }
 

@@ -18,8 +18,6 @@ use bevy_liquidfun::{
     dynamics::{b2BodyDef, b2BodyType::Dynamic, b2World},
 };
 
-const FIXED_TIMESTEP: f64 = 0.02;
-
 #[derive(Resource)]
 struct ShapeCollection {
     pub shapes: Vec<b2Shape>,
@@ -83,7 +81,6 @@ fn main() {
                 cast_ray,
             ),
         )
-        .insert_resource(Time::<Fixed>::from_seconds(FIXED_TIMESTEP))
         .insert_resource(RayCastMode::Closest)
         .run();
 }

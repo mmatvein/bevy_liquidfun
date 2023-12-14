@@ -19,8 +19,6 @@ use bevy_liquidfun::{
     dynamics::{b2BodyDef, b2BodyType::Dynamic, b2World},
 };
 
-const FIXED_TIMESTEP: f64 = 0.02;
-
 fn main() {
     App::new()
         .add_plugins((
@@ -34,7 +32,6 @@ fn main() {
             (setup_physics_world, setup_box, setup_particles).chain(),
         )
         .add_systems(FixedUpdate, set_motor_speed)
-        .insert_resource(Time::<Fixed>::from_seconds(FIXED_TIMESTEP))
         .run();
 }
 
