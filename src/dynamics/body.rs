@@ -1,9 +1,13 @@
-use crate::dynamics::b2World;
-use crate::internal::{to_Vec2, to_b2Vec2};
+use std::collections::HashSet;
+use std::ops::Deref;
+
 use bevy::prelude::*;
+
 use libliquidfun_sys::box2d::ffi;
 use libliquidfun_sys::box2d::ffi::b2BodyType::{b2_dynamicBody, b2_kinematicBody, b2_staticBody};
-use std::collections::HashSet;
+
+use crate::dynamics::b2World;
+use crate::internal::{to_Vec2, to_b2Vec2};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -185,4 +189,17 @@ impl ExternalForce {
         self.force = Vec2::ZERO;
         self.torque = 0.;
     }
+}
+
+#[derive(Component, Debug, Deref, DerefMut)]
+pub struct GravityScale(pub f32);
+
+impl Default for GravityScale {
+    fn default() -> Self {
+        Self(1.)
+    }
+}
+
+impl GravityScale {
+    pub const ZERO: Self = Self(0.);
 }

@@ -1,7 +1,7 @@
 use crate::collision::b2Shape;
 use crate::dynamics::{
     b2Body, b2Fixture, b2Joint, b2PrismaticJoint, b2RevoluteJoint, b2World, b2WorldSettings,
-    ExternalForce, JointPtr,
+    ExternalForce, GravityScale, JointPtr,
 };
 use crate::internal::to_b2Vec2;
 use crate::particles::{b2ParticleGroup, b2ParticleSystem};
@@ -41,6 +41,7 @@ impl Plugin for LiquidFunPlugin {
                     sync_revolute_joints_to_world,
                     sync_prismatic_joints_to_world,
                     apply_forces,
+                    apply_gravity_scale,
                     step_physics,
                     sync_bodies_from_world,
                     sync_particle_systems_from_world,
@@ -239,6 +240,17 @@ fn apply_forces(
     }
 }
 
+fn apply_gravity_scale(
+    mut b2_world: NonSendMut<b2World>,
+    gravity_scales: Query<(Entity, &GravityScale)>,
+) {
+    for (entity, gravity_scale) in gravity_scales.iter() {
+        let body_ptr = b2_world.get_body_ptr_mut(entity);
+        if let Some(body_ptr) = body_ptr {
+            body_ptr.as_mut().SetGravityScale(gravity_scale.0);
+        }
+    }
+}
 fn sync_bodies_from_world(b2_world: NonSend<b2World>, mut bodies: Query<(Entity, &mut b2Body)>) {
     for (entity, mut body) in bodies.iter_mut() {
         body.sync_with_world(entity, &b2_world);
