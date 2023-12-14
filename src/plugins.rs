@@ -229,14 +229,21 @@ fn apply_forces(
     external_forces: Query<(Entity, &ExternalForce)>,
 ) {
     for (entity, external_force) in external_forces.iter() {
-        let body_ptr = b2_world.get_body_ptr_mut(entity).unwrap();
-        body_ptr.as_mut().ApplyForceToCenter(
-            &to_b2Vec2(&external_force.force()),
-            external_force.should_wake,
-        );
-        body_ptr
-            .as_mut()
-            .ApplyTorque(external_force.torque(), false);
+        let body_ptr = b2_world.get_body_ptr_mut(entity);
+        if let Some(body_ptr) = body_ptr {
+            body_ptr.as_mut().ApplyForceToCenter(
+                &to_b2Vec2(&external_force.force()),
+                external_force.should_wake,
+            );
+            body_ptr
+                .as_mut()
+                .ApplyTorque(external_force.torque(), false);
+        } else {
+            warn!(
+                "Encountered ExternalForce component on an Entity without a matching b2Body: {:?}",
+                entity
+            );
+        }
     }
 }
 
@@ -248,6 +255,11 @@ fn apply_gravity_scale(
         let body_ptr = b2_world.get_body_ptr_mut(entity);
         if let Some(body_ptr) = body_ptr {
             body_ptr.as_mut().SetGravityScale(gravity_scale.0);
+        } else {
+            warn!(
+                "Encountered GravityScale component on an Entity without a matching b2Body: {:?}",
+                entity
+            );
         }
     }
 }
