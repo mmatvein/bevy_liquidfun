@@ -43,6 +43,7 @@ pub struct b2Body {
     pub position: Vec2,
     pub angle: f32,
     pub linear_velocity: Vec2,
+    pub angular_velocity: f32,
     pub awake: bool,
     pub allow_sleep: bool,
     pub fixed_rotation: bool,
@@ -58,10 +59,11 @@ impl b2Body {
             position: body_def.position,
             angle: body_def.angle,
             linear_velocity: Vec2::ZERO,
+            angular_velocity: 0.,
             mass: 0.,
             awake: true,
             allow_sleep: body_def.allow_sleep,
-            fixed_rotation: body_def.fixed_rotation
+            fixed_rotation: body_def.fixed_rotation,
         }
     }
 
@@ -70,6 +72,7 @@ impl b2Body {
         self.position = to_Vec2(body_ptr.as_ref().GetPosition());
         self.angle = body_ptr.as_ref().GetAngle();
         self.linear_velocity = to_Vec2(body_ptr.as_ref().GetLinearVelocity());
+        self.angular_velocity = body_ptr.as_ref().GetAngularVelocity();
         self.mass = body_ptr.as_ref().GetMass();
         self.awake = body_ptr.as_ref().IsAwake();
     }
@@ -82,6 +85,7 @@ impl b2Body {
         body_ptr
             .as_mut()
             .SetLinearVelocity(&to_b2Vec2(&self.linear_velocity));
+        body_ptr.as_mut().SetAngularVelocity(self.angular_velocity);
         body_ptr.as_mut().SetAwake(self.awake);
         body_ptr.as_mut().SetSleepingAllowed(self.allow_sleep);
     }
@@ -99,7 +103,9 @@ impl b2Body {
         }
 
         let body_ptr = option.unwrap();
-        body_ptr.as_mut().ApplyForce(&to_b2Vec2(&force), &to_b2Vec2(&force), true);
+        body_ptr
+            .as_mut()
+            .ApplyForce(&to_b2Vec2(&force), &to_b2Vec2(&force), true);
     }
 }
 
