@@ -62,6 +62,7 @@ impl b2FixtureDef {
         let mut b2fixture_def = ffi::b2FixtureDef::new().within_box();
         b2fixture_def.density = self.density;
         b2fixture_def.shape = self.shape.to_ffi();
+        b2fixture_def.friction = self.friction;
 
         return b2fixture_def;
     }
