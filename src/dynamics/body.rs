@@ -190,6 +190,19 @@ impl ExternalForce {
     }
 }
 
+#[derive(Component, Debug, Default)]
+pub struct ExternalTorque {
+    pub torque: f32,
+    pub should_wake: bool,
+}
+
+impl ExternalTorque {
+    pub const ZERO: Self = Self {
+        torque: 0.,
+        should_wake: false,
+    };
+}
+
 #[derive(Component, Debug, Deref, DerefMut)]
 pub struct GravityScale(pub f32);
 

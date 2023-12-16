@@ -1,7 +1,7 @@
 use crate::collision::b2Shape;
 use crate::dynamics::{
     b2Body, b2Fixture, b2Joint, b2PrismaticJoint, b2RevoluteJoint, b2World, b2WorldSettings,
-    ExternalForce, GravityScale, JointPtr,
+    ExternalForce, ExternalTorque, GravityScale, JointPtr,
 };
 use crate::internal::to_b2Vec2;
 use crate::particles::{b2ParticleGroup, b2ParticleSystem};
@@ -24,7 +24,7 @@ impl Plugin for LiquidFunPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(self.settings.clone())
             .insert_resource(PhysicsTimeAccumulator(0.))
-            .add_systems(PreUpdate, clear_forces)
+            .add_systems(PreUpdate, (clear_forces, clear_torques))
             .add_systems(
                 PostUpdate,
                 (
@@ -41,6 +41,7 @@ impl Plugin for LiquidFunPlugin {
                     sync_revolute_joints_to_world,
                     sync_prismatic_joints_to_world,
                     apply_forces,
+                    apply_torques,
                     apply_gravity_scale,
                     step_physics,
                     sync_bodies_from_world,
@@ -79,6 +80,13 @@ fn clear_forces(mut external_forces: Query<&mut ExternalForce>) {
         force.clear()
     }
 }
+
+fn clear_torques(mut external_torques: Query<&mut ExternalTorque>) {
+    for mut external_torques in external_torques.iter_mut() {
+        external_torques.torque = 0.;
+    }
+}
+
 fn create_bodies(
     mut b2_world: NonSendMut<b2World>,
     mut added: Query<(Entity, &mut b2Body), Added<b2Body>>,
@@ -241,6 +249,25 @@ fn apply_forces(
         } else {
             warn!(
                 "Encountered ExternalForce component on an Entity without a matching b2Body: {:?}",
+                entity
+            );
+        }
+    }
+}
+
+fn apply_torques(
+    mut b2_world: NonSendMut<b2World>,
+    external_torques: Query<(Entity, &ExternalTorque)>,
+) {
+    for (entity, external_torque) in external_torques.iter() {
+        let body_ptr = b2_world.get_body_ptr_mut(entity);
+        if let Some(body_ptr) = body_ptr {
+            body_ptr
+                .as_mut()
+                .ApplyTorque(external_torque.torque, external_torque.should_wake);
+        } else {
+            warn!(
+                "Encountered ExternalTorque component on an Entity without a matching b2Body: {:?}",
                 entity
             );
         }
