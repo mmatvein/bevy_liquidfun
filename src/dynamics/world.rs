@@ -86,6 +86,7 @@ impl<'a> b2World<'a> {
         b2body_def.type_ = body.body_type.into();
         b2body_def.position = to_b2Vec2(&body.position);
         b2body_def.fixedRotation = body.fixed_rotation;
+        b2body_def.userData.pointer = entity.to_bits() as usize;
 
         unsafe {
             let ffi_body = self.ffi_world.as_mut().CreateBody(&*b2body_def);
@@ -120,7 +121,8 @@ impl<'a> b2World<'a> {
 
         let mut body_ptr = self.body_ptrs.get_mut(&body_entity).unwrap().as_mut();
         let mut b2fixture_def = fixture_component.extract_fixture_def().to_ffi();
-        b2fixture_def.as_mut().userData.pointer = std::ptr::addr_of!(fixture_entity) as usize;
+        let fixture_entity_ptr = fixture_entity.to_bits() as usize;
+        b2fixture_def.as_mut().userData.pointer = fixture_entity_ptr;
 
         unsafe {
             let ffi_fixture = body_ptr

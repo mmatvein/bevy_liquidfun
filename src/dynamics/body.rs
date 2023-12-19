@@ -1,6 +1,5 @@
-use std::collections::HashSet;
-
 use bevy::prelude::*;
+use bevy::utils::hashbrown::HashSet;
 
 use libliquidfun_sys::box2d::ffi;
 use libliquidfun_sys::box2d::ffi::b2BodyType::{b2_dynamicBody, b2_kinematicBody, b2_staticBody};
@@ -95,6 +94,10 @@ impl b2Body {
 
     pub fn get_mass(&self) -> f32 {
         self.mass
+    }
+
+    pub fn fixtures(&self) -> &HashSet<Entity> {
+        &self.fixtures
     }
 }
 
