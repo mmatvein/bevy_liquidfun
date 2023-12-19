@@ -289,3 +289,30 @@ impl b2RayCastFilter for b2ExcludeBodiesFilter {
         return !self.excluded_bodies.contains(&body_entity);
     }
 }
+
+#[derive(Debug)]
+#[allow(non_camel_case_types)]
+pub struct b2CategoryFilter {
+    allowed_categories: u16,
+}
+
+impl b2CategoryFilter {
+    pub fn new<T: Into<u16>>(allowed_categories: T) -> Self {
+        Self {
+            allowed_categories: allowed_categories.into(),
+        }
+    }
+}
+
+impl b2RayCastFilter for b2CategoryFilter {
+    fn should_use(
+        &self,
+        _body_entity: Entity,
+        _body: Pin<&mut ffi_b2Body>,
+        _fixture_entity: Entity,
+        fixture: Pin<&mut ffi_b2Fixture>,
+    ) -> bool {
+        let filter = fixture.GetFilterData();
+        return self.allowed_categories & u16::from(filter.categoryBits) != 0;
+    }
+}

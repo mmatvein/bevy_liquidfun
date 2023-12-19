@@ -9,7 +9,8 @@ use bevy::prelude::*;
 use rand::prelude::*;
 
 use bevy_liquidfun::dynamics::{
-    b2BodyBundle, b2Fixture, b2FixtureDef, b2RayCastAll, b2RayCastAny, b2RayCastClosest,
+    b2BodyBundle, b2CategoryFilter, b2Fixture, b2FixtureDef, b2RayCastAll, b2RayCastAny,
+    b2RayCastClosest,
 };
 use bevy_liquidfun::plugins::{LiquidFunDebugDrawPlugin, LiquidFunPlugin};
 use bevy_liquidfun::utils::DebugDrawFixtures;
@@ -161,8 +162,10 @@ fn check_create_body_keys(
     commands: Commands,
 ) {
     let mut shape_index = None;
+    let mut filter_category = None;
     if key_input.just_pressed(KeyCode::Key1) {
         shape_index = Some(0);
+        filter_category = Some(2u16);
     } else if key_input.just_pressed(KeyCode::Key2) {
         shape_index = Some(1);
     } else if key_input.just_pressed(KeyCode::Key3) {
@@ -175,11 +178,11 @@ fn check_create_body_keys(
 
     if let Some(i) = shape_index {
         let shape = &shape_collection.shapes[i];
-        create_body(shape, commands);
+        create_body(shape, commands, filter_category.unwrap_or(1u16));
     }
 }
 
-fn create_body(shape: &b2Shape, mut commands: Commands) {
+fn create_body(shape: &b2Shape, mut commands: Commands, filter_category: u16) {
     let mut rng = thread_rng();
     let body_def = b2BodyDef {
         body_type: Dynamic,
@@ -195,8 +198,10 @@ fn create_body(shape: &b2Shape, mut commands: Commands) {
         shape: shape.clone(),
         density: 1.0,
         friction: 0.3,
+        filter_category,
         ..default()
     };
+
     commands.spawn((
         b2Fixture::new(body_entity, &fixture_def),
         DebugDrawFixtures::default_dynamic(),
@@ -232,24 +237,25 @@ fn cast_ray(
     let ray_end = ray_start + Vec2::new(RAY_LENGTH * f32::cos(angle), RAY_LENGTH * f32::sin(angle));
     gizmos.line_2d(ray_start, ray_end, Color::WHITE);
 
+    let filter = b2CategoryFilter::new(!2u16);
     match mode.as_ref() {
         RayCastMode::Closest => {
             let callback = b2RayCastClosest::new();
-            let hit = b2_world.ray_cast(callback, &ray_start, &ray_end);
+            let hit = b2_world.ray_cast_with_filter(callback, filter, &ray_start, &ray_end);
             if let Some(hit) = hit {
                 gizmos.line_2d(hit.point, hit.point + hit.normal, Color::ORANGE_RED);
             }
         }
         RayCastMode::Any => {
             let callback = b2RayCastAny::new();
-            let hit = b2_world.ray_cast(callback, &ray_start, &ray_end);
+            let hit = b2_world.ray_cast_with_filter(callback, filter, &ray_start, &ray_end);
             if let Some(hit) = hit {
                 gizmos.line_2d(hit.point, hit.point + hit.normal, Color::ORANGE_RED);
             }
         }
         RayCastMode::All => {
             let callback = b2RayCastAll::new();
-            let hits = b2_world.ray_cast(callback, &ray_start, &ray_end);
+            let hits = b2_world.ray_cast_with_filter(callback, filter, &ray_start, &ray_end);
             for hit in hits {
                 gizmos.line_2d(hit.point, hit.point + hit.normal, Color::ORANGE_RED);
             }
