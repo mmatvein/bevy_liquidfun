@@ -9,7 +9,10 @@ use bevy::prelude::*;
 use libliquidfun_sys::box2d::ffi::{b2RayCastCallbackWrapper, int32};
 use libliquidfun_sys::box2d::*;
 
-use crate::dynamics::{b2Body, b2Fixture, b2Joint, b2RayCast, b2RayCastCallback, JointPtr};
+use crate::dynamics::{
+    b2Body, b2Fixture, b2Joint, b2NoOpFilter, b2RayCast, b2RayCastCallback, b2RayCastFilter,
+    JointPtr,
+};
 use crate::internal::*;
 use crate::particles::{b2ParticleGroup, b2ParticleSystem};
 
@@ -247,7 +250,17 @@ impl<'a> b2World<'a> {
         start: &Vec2,
         end: &Vec2,
     ) -> T::Result {
-        let ray_cast_wrapper = b2RayCast::new(callback);
+        return self.ray_cast_with_filter(callback, b2NoOpFilter::default(), start, end);
+    }
+
+    pub fn ray_cast_with_filter<T: b2RayCastCallback + 'static, F: b2RayCastFilter + 'static>(
+        &mut self,
+        callback: T,
+        filter: F,
+        start: &Vec2,
+        end: &Vec2,
+    ) -> T::Result {
+        let ray_cast_wrapper = b2RayCast::new(callback, filter);
         let ray_cast_wrapper = Arc::new(RefCell::new(ray_cast_wrapper));
         let ray_cast_callback_wrapper = b2RayCastCallbackWrapper::new(ray_cast_wrapper.clone());
         unsafe {
