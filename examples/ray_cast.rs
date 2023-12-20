@@ -9,7 +9,7 @@ use bevy::prelude::*;
 use rand::prelude::*;
 
 use bevy_liquidfun::dynamics::{
-    b2BodyBundle, b2CategoryFilter, b2Fixture, b2FixtureDef, b2RayCastAll, b2RayCastAny,
+    b2BodyBundle, b2CategoryFilter, b2Filter, b2Fixture, b2FixtureDef, b2RayCastAll, b2RayCastAny,
     b2RayCastClosest,
 };
 use bevy_liquidfun::plugins::{LiquidFunDebugDrawPlugin, LiquidFunPlugin};
@@ -198,7 +198,10 @@ fn create_body(shape: &b2Shape, mut commands: Commands, filter_category: u16) {
         shape: shape.clone(),
         density: 1.0,
         friction: 0.3,
-        filter_category,
+        filter: b2Filter {
+            category: filter_category,
+            ..default()
+        },
         ..default()
     };
 

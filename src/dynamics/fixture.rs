@@ -43,9 +43,15 @@ pub struct b2FixtureDef {
     pub restitution: f32,
     pub restitution_threshold: f32,
     pub is_sensor: bool,
-    pub filter_category: u16,
-    pub filter_mask: u16,
-    pub filter_group_index: i16,
+    pub filter: b2Filter,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Copy, Clone)]
+pub struct b2Filter {
+    pub category: u16,
+    pub mask: u16,
+    pub group_index: i16,
 }
 
 impl b2FixtureDef {
@@ -65,9 +71,9 @@ impl b2FixtureDef {
         b2fixture_def.restitution = self.restitution;
         b2fixture_def.restitutionThreshold = self.restitution_threshold;
         b2fixture_def.isSensor = self.is_sensor;
-        b2fixture_def.filter.categoryBits = uint16::from(self.filter_category);
-        b2fixture_def.filter.maskBits = uint16::from(self.filter_mask);
-        b2fixture_def.filter.groupIndex = int16::from(self.filter_group_index);
+        b2fixture_def.filter.categoryBits = uint16::from(self.filter.category);
+        b2fixture_def.filter.maskBits = uint16::from(self.filter.mask);
+        b2fixture_def.filter.groupIndex = int16::from(self.filter.group_index);
         return b2fixture_def;
     }
 }
@@ -81,9 +87,17 @@ impl Default for b2FixtureDef {
             restitution: 0.,
             restitution_threshold: 1.,
             is_sensor: false,
-            filter_category: 0x0001,
-            filter_mask: 0xFFFF,
-            filter_group_index: 0,
+            filter: b2Filter::default(),
+        }
+    }
+}
+
+impl Default for b2Filter {
+    fn default() -> Self {
+        Self {
+            category: 0x0001,
+            mask: 0xFFFF,
+            group_index: 0,
         }
     }
 }
