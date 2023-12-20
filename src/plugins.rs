@@ -102,7 +102,7 @@ fn create_fixtures(
     mut bodies: Query<(Entity, &mut b2Body)>,
 ) {
     for (fixture_entity, mut fixture) in added.iter_mut() {
-        let mut body = bodies.get_mut(fixture.get_body_entity()).unwrap();
+        let mut body = bodies.get_mut(fixture.body()).unwrap();
         b2_world.create_fixture((fixture_entity, &mut fixture), (body.0, &mut body.1));
     }
 }
@@ -341,14 +341,14 @@ fn draw_fixtures(
     let to_global =
         |transform: &GlobalTransform, p: Vec2| transform.transform_point(p.extend(0.)).truncate();
     for (fixture, debug_draw_fixtures) in fixtures.iter() {
-        let body_entity = fixture.get_body_entity();
+        let body_entity = fixture.body();
         let (body, transform) = bodies.get(body_entity).unwrap();
         let color = if body.awake {
             debug_draw_fixtures.awake_color
         } else {
             debug_draw_fixtures.asleep_color
         };
-        let shape = fixture.get_shape();
+        let shape = &fixture.def().shape;
         match shape {
             b2Shape::Circle { radius, position } => {
                 gizmos.circle_2d(to_global(transform, *position), *radius, color);

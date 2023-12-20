@@ -10,27 +10,23 @@ use std::pin::Pin;
 #[derive(Component, Debug)]
 pub struct b2Fixture {
     body: Entity,
-    fixture_def: b2FixtureDef,
+    def: b2FixtureDef,
 }
 
 impl b2Fixture {
     pub fn new(body: Entity, fixture_def: &b2FixtureDef) -> Self {
         b2Fixture {
             body,
-            fixture_def: (*fixture_def).clone(),
+            def: (*fixture_def).clone(),
         }
     }
 
-    pub fn get_body_entity(&self) -> Entity {
+    pub fn body(&self) -> Entity {
         self.body
     }
 
-    pub fn get_shape(&self) -> &b2Shape {
-        &self.fixture_def.shape
-    }
-
-    pub fn fixture_def(&self) -> &b2FixtureDef {
-        &self.fixture_def
+    pub fn def(&self) -> &b2FixtureDef {
+        &self.def
     }
 }
 
