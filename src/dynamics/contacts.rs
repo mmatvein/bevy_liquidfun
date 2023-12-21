@@ -12,6 +12,7 @@ use std::pin::Pin;
 pub struct b2ContactListener {
     fixture_contacts: HashMap<(Entity, Entity), b2Contact>,
     begun_contacts: HashSet<(Entity, Entity)>,
+    ended_contacts: HashMap<(Entity, Entity), b2Contact>,
 }
 
 #[allow(non_camel_case_types)]
@@ -26,12 +27,16 @@ pub struct b2Contact {
 #[allow(non_camel_case_types)]
 #[derive(Event, Debug, Copy, Clone)]
 pub struct b2BeginContactEvent(pub b2Contact);
+#[allow(non_camel_case_types)]
+#[derive(Event, Debug, Copy, Clone)]
+pub struct b2EndContactEvent(pub b2Contact);
 
 impl b2ContactListener {
     pub fn new() -> Self {
         Self {
             fixture_contacts: HashMap::new(),
             begun_contacts: HashSet::new(),
+            ended_contacts: HashMap::new(),
         }
     }
 
@@ -42,45 +47,30 @@ impl b2ContactListener {
     pub fn begun_contacts(&self) -> &HashSet<(Entity, Entity)> {
         &self.begun_contacts
     }
+
+    pub fn ended_contacts(&self) -> &HashMap<(Entity, Entity), b2Contact> {
+        &self.ended_contacts
+    }
+
+    pub fn clear_contact_changes(&mut self) {
+        self.begun_contacts.clear();
+        self.ended_contacts.clear();
+    }
 }
 
 impl b2ContactListenerImpl for b2ContactListener {
     fn begin_contact(&mut self, contact: &mut ffi_b2Contact) {
-        unsafe {
-            let mut contact = Pin::new_unchecked(contact);
-            let mut fixture_a =
-                Pin::new_unchecked(contact.as_mut().GetFixtureA().as_mut().unwrap());
-            let mut fixture_b =
-                Pin::new_unchecked(contact.as_mut().GetFixtureB().as_mut().unwrap());
-            let mut body_a = Pin::new_unchecked(fixture_a.as_mut().GetBody().as_mut().unwrap());
-            let mut body_b = Pin::new_unchecked(fixture_b.as_mut().GetBody().as_mut().unwrap());
-
-            let fixture_a_entity = Entity::from_bits(
-                fixture_a.as_mut().GetUserData().get_unchecked_mut().pointer as u64,
-            );
-            let fixture_b_entity = Entity::from_bits(
-                fixture_b.as_mut().GetUserData().get_unchecked_mut().pointer as u64,
-            );
-            let body_a_entity =
-                Entity::from_bits(body_a.as_mut().GetUserData().get_unchecked_mut().pointer as u64);
-            let body_b_entity =
-                Entity::from_bits(body_b.as_mut().GetUserData().get_unchecked_mut().pointer as u64);
-
-            let contact = b2Contact {
-                fixture_a: fixture_a_entity,
-                fixture_b: fixture_b_entity,
-                body_a: body_a_entity,
-                body_b: body_b_entity,
-            };
-            let key = (
-                Entity::min(fixture_a_entity, fixture_b_entity),
-                Entity::max(fixture_a_entity, fixture_b_entity),
-            );
-            self.fixture_contacts.insert(key, contact);
-            self.begun_contacts.insert(key);
-        }
+        let contact = b2Contact::from_ffi_contact(contact);
+        let key = contact.get_contact_key();
+        self.fixture_contacts.insert(key, contact);
+        self.begun_contacts.insert(key);
     }
-    fn end_contact(&mut self, _contact: &mut ffi_b2Contact) {}
+    fn end_contact(&mut self, contact: &mut ffi_b2Contact) {
+        let contact = b2Contact::from_ffi_contact(contact);
+        let key = contact.get_contact_key();
+        self.fixture_contacts.remove(&key);
+        self.ended_contacts.insert(key, contact);
+    }
     fn begin_particle_body_contact(
         &mut self,
         _particle_system: &mut b2ParticleSystem,
@@ -109,4 +99,43 @@ impl b2ContactListenerImpl for b2ContactListener {
     }
     fn pre_solve(&mut self, _contact: &mut ffi_b2Contact, _old_manifold: &b2Manifold) {}
     fn post_solve(&mut self, _contact: &mut ffi_b2Contact, _impulse: &b2ContactImpulse) {}
+}
+
+impl b2Contact {
+    fn from_ffi_contact(contact: &mut ffi_b2Contact) -> Self {
+        unsafe {
+            let mut contact = Pin::new_unchecked(contact);
+            let mut fixture_a =
+                Pin::new_unchecked(contact.as_mut().GetFixtureA().as_mut().unwrap());
+            let mut fixture_b =
+                Pin::new_unchecked(contact.as_mut().GetFixtureB().as_mut().unwrap());
+            let mut body_a = Pin::new_unchecked(fixture_a.as_mut().GetBody().as_mut().unwrap());
+            let mut body_b = Pin::new_unchecked(fixture_b.as_mut().GetBody().as_mut().unwrap());
+
+            let fixture_a_entity = Entity::from_bits(
+                fixture_a.as_mut().GetUserData().get_unchecked_mut().pointer as u64,
+            );
+            let fixture_b_entity = Entity::from_bits(
+                fixture_b.as_mut().GetUserData().get_unchecked_mut().pointer as u64,
+            );
+            let body_a_entity =
+                Entity::from_bits(body_a.as_mut().GetUserData().get_unchecked_mut().pointer as u64);
+            let body_b_entity =
+                Entity::from_bits(body_b.as_mut().GetUserData().get_unchecked_mut().pointer as u64);
+
+            b2Contact {
+                fixture_a: fixture_a_entity,
+                fixture_b: fixture_b_entity,
+                body_a: body_a_entity,
+                body_b: body_b_entity,
+            }
+        }
+    }
+
+    fn get_contact_key(&self) -> (Entity, Entity) {
+        (
+            Entity::min(self.fixture_a, self.fixture_b),
+            Entity::max(self.fixture_a, self.fixture_b),
+        )
+    }
 }

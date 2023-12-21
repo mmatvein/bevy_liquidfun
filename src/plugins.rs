@@ -1,7 +1,8 @@
 use crate::collision::b2Shape;
 use crate::dynamics::{
-    b2BeginContactEvent, b2Body, b2Fixture, b2Joint, b2PrismaticJoint, b2RevoluteJoint, b2World,
-    b2WorldSettings, ExternalForce, ExternalTorque, GravityScale, JointPtr,
+    b2BeginContactEvent, b2Body, b2EndContactEvent, b2Fixture, b2Joint, b2PrismaticJoint,
+    b2RevoluteJoint, b2World, b2WorldSettings, ExternalForce, ExternalTorque, GravityScale,
+    JointPtr,
 };
 use crate::internal::to_b2Vec2;
 use crate::particles::{b2ParticleGroup, b2ParticleSystem};
@@ -51,7 +52,8 @@ impl Plugin for LiquidFunPlugin {
                 )
                     .chain(),
             )
-            .add_event::<b2BeginContactEvent>();
+            .add_event::<b2BeginContactEvent>()
+            .add_event::<b2EndContactEvent>();
     }
 }
 
@@ -309,16 +311,26 @@ fn sync_particle_systems_from_world(
 
 fn sync_contacts(
     mut begin_contact_events: EventWriter<b2BeginContactEvent>,
+    mut end_contact_events: EventWriter<b2EndContactEvent>,
     b2_world: NonSendMut<b2World>,
 ) {
     let contact_listener = b2_world.contact_listener();
-    let contact_listener = contact_listener.borrow();
+    let mut contact_listener = contact_listener.borrow_mut();
     let fixture_contacts = contact_listener.fixture_contacts();
-
+    let ended_contacts = contact_listener.ended_contacts();
     for key in contact_listener.begun_contacts() {
-        let contact = fixture_contacts.get(key).unwrap();
-        begin_contact_events.send(b2BeginContactEvent(contact.clone()));
+        // if the contact is not available in fixture contacts anymore, the contact has ended during the same frame
+        let contact = fixture_contacts.get(key).or(ended_contacts.get(key));
+        if let Some(contact) = contact {
+            begin_contact_events.send(b2BeginContactEvent(contact.clone()));
+        }
     }
+
+    for contact in ended_contacts.values() {
+        end_contact_events.send(b2EndContactEvent(contact.clone()))
+    }
+
+    contact_listener.clear_contact_changes();
 }
 
 fn update_transforms(
