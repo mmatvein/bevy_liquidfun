@@ -1,17 +1,18 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use autocxx::WithinBox;
 use bevy::prelude::*;
 
-use libliquidfun_sys::box2d::ffi::{b2RayCastCallbackWrapper, int32};
+use libliquidfun_sys::box2d::ffi::{b2ContactListenerWrapper, b2RayCastCallbackWrapper, int32};
 use libliquidfun_sys::box2d::*;
 
 use crate::dynamics::{
-    b2Body, b2Fixture, b2Joint, b2NoOpFilter, b2RayCast, b2RayCastCallback, b2RayCastFilter,
-    JointPtr,
+    b2Body, b2ContactListener, b2Fixture, b2Joint, b2NoOpFilter, b2RayCast, b2RayCastCallback,
+    b2RayCastFilter, JointPtr,
 };
 use crate::internal::*;
 use crate::particles::{b2ParticleGroup, b2ParticleSystem};
@@ -48,6 +49,10 @@ pub struct b2World<'a> {
     body_to_fixtures: HashMap<Entity, HashSet<Entity>>,
     fixture_to_body: HashMap<Entity, Entity>,
 
+    contact_listener: Arc<RefCell<b2ContactListener>>,
+    #[allow(dead_code)]
+    ffi_contact_listener: Rc<RefCell<b2ContactListenerWrapper>>,
+
     pub gravity: Vec2,
 }
 
@@ -56,7 +61,20 @@ impl<'a> b2World<'a> {}
 impl<'a> b2World<'a> {
     pub fn new(gravity: Vec2) -> Self {
         let ffi_gravity = to_b2Vec2(&gravity);
-        let ffi_world = ffi::b2World::new(&ffi_gravity).within_box();
+        let mut ffi_world = ffi::b2World::new(&ffi_gravity).within_box();
+        let contact_listener = b2ContactListener::new();
+        let contact_listener = Arc::new(RefCell::new(contact_listener));
+        let ffi_contact_listener = ffi::b2ContactListenerWrapper::new(contact_listener.clone());
+
+        unsafe {
+            let ffi_contact_listener: *mut ffi::b2ContactListener = ffi_contact_listener
+                .as_ref()
+                .borrow_mut()
+                .pin_mut()
+                .as_mut()
+                .get_unchecked_mut();
+            ffi_world.as_mut().SetContactListener(ffi_contact_listener);
+        }
         b2World {
             gravity,
             ffi_world,
@@ -66,6 +84,8 @@ impl<'a> b2World<'a> {
             particle_system_ptrs: HashMap::new(),
             body_to_fixtures: HashMap::new(),
             fixture_to_body: HashMap::new(),
+            contact_listener,
+            ffi_contact_listener,
         }
     }
 
@@ -242,6 +262,10 @@ impl<'a> b2World<'a> {
 
     pub(crate) fn get_joint_ptr(&mut self, joint_entity: &Entity) -> Option<&mut JointPtr<'a>> {
         self.joint_ptrs.get_mut(joint_entity)
+    }
+
+    pub(crate) fn contact_listener(&self) -> Arc<RefCell<b2ContactListener>> {
+        self.contact_listener.clone()
     }
 
     pub fn ray_cast<T: b2RayCastCallback + 'static>(

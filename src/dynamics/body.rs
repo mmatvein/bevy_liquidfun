@@ -92,7 +92,7 @@ impl b2Body {
         body_ptr.as_mut().SetSleepingAllowed(self.allow_sleep);
     }
 
-    pub fn get_mass(&self) -> f32 {
+    pub fn mass(&self) -> f32 {
         self.mass
     }
 

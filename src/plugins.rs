@@ -1,7 +1,7 @@
 use crate::collision::b2Shape;
 use crate::dynamics::{
-    b2Body, b2Fixture, b2Joint, b2PrismaticJoint, b2RevoluteJoint, b2World, b2WorldSettings,
-    ExternalForce, ExternalTorque, GravityScale, JointPtr,
+    b2BeginContactEvent, b2Body, b2Fixture, b2Joint, b2PrismaticJoint, b2RevoluteJoint, b2World,
+    b2WorldSettings, ExternalForce, ExternalTorque, GravityScale, JointPtr,
 };
 use crate::internal::to_b2Vec2;
 use crate::particles::{b2ParticleGroup, b2ParticleSystem};
@@ -46,10 +46,12 @@ impl Plugin for LiquidFunPlugin {
                     step_physics,
                     sync_bodies_from_world,
                     sync_particle_systems_from_world,
+                    sync_contacts,
                     update_transforms,
                 )
                     .chain(),
-            );
+            )
+            .add_event::<b2BeginContactEvent>();
     }
 }
 
@@ -302,6 +304,20 @@ fn sync_particle_systems_from_world(
 ) {
     for (entity, mut particle_system) in particle_systems.iter_mut() {
         particle_system.sync_with_world(entity, &b2_world);
+    }
+}
+
+fn sync_contacts(
+    mut begin_contact_events: EventWriter<b2BeginContactEvent>,
+    b2_world: NonSendMut<b2World>,
+) {
+    let contact_listener = b2_world.contact_listener();
+    let contact_listener = contact_listener.borrow();
+    let fixture_contacts = contact_listener.fixture_contacts();
+
+    for key in contact_listener.begun_contacts() {
+        let contact = fixture_contacts.get(key).unwrap();
+        begin_contact_events.send(b2BeginContactEvent(contact.clone()));
     }
 }
 

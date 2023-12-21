@@ -15,11 +15,13 @@ pub mod dynamics {
         mod prismatic_joint;
         pub use prismatic_joint::*;
     }
+    mod contacts;
     mod fixture;
     mod ray_cast;
     mod world;
 
     pub use body::*;
+    pub use contacts::*;
     pub use fixture::*;
     pub use joints::*;
     pub use ray_cast::*;
