@@ -317,8 +317,8 @@ fn sync_contacts(
     let contact_listener = b2_world.contact_listener();
     let mut contact_listener = contact_listener.borrow_mut();
     let fixture_contacts = contact_listener.fixture_contacts();
-    let ended_contacts = contact_listener.ended_contacts();
-    for key in contact_listener.begun_contacts() {
+    let ended_contacts = contact_listener.ended_fixture_contacts();
+    for key in contact_listener.begun_fixture_contacts() {
         // if the contact is not available in fixture contacts anymore, the contact has ended during the same frame
         let contact = fixture_contacts.get(key).or(ended_contacts.get(key));
         if let Some(contact) = contact {
