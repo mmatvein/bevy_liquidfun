@@ -1,14 +1,23 @@
 use crate::collision::b2Shape;
 use crate::dynamics::{
-    b2BeginContactEvent, b2Body, b2EndContactEvent, b2Fixture, b2Joint, b2PrismaticJoint,
-    b2RevoluteJoint, b2World, b2WorldSettings, ExternalForce, ExternalTorque, GravityScale,
-    JointPtr,
+    b2BeginContactEvent, b2BeginParticleBodyContactEvent, b2Body, b2EndContactEvent,
+    b2EndParticleBodyContactEvent, b2Fixture, b2Joint, b2PrismaticJoint, b2RevoluteJoint, b2World,
+    b2WorldSettings, ExternalForce, ExternalTorque, GravityScale, JointPtr,
 };
 use crate::internal::to_b2Vec2;
 use crate::particles::{b2ParticleGroup, b2ParticleSystem};
 use crate::utils::{DebugDrawFixtures, DebugDrawParticleSystem};
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
+
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+enum LiquidFunSet {
+    ClearEvents,
+    SyncToPhysicsWorld,
+    ApplyForces,
+    Step,
+    SyncFromPhysicsWorld,
+}
 
 #[derive(Default)]
 pub struct LiquidFunPlugin {
@@ -23,11 +32,30 @@ impl LiquidFunPlugin {
 
 impl Plugin for LiquidFunPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(self.settings.clone())
-            .insert_resource(PhysicsTimeAccumulator(0.))
-            .add_systems(PreUpdate, (clear_forces, clear_torques))
-            .add_systems(
-                PostUpdate,
+        app.configure_sets(
+            PostUpdate,
+            (
+                LiquidFunSet::ClearEvents,
+                LiquidFunSet::SyncToPhysicsWorld,
+                LiquidFunSet::ApplyForces,
+                LiquidFunSet::Step,
+                LiquidFunSet::SyncFromPhysicsWorld,
+            )
+                .chain(),
+        )
+        .insert_resource(self.settings.clone())
+        .insert_resource(PhysicsTimeAccumulator(0.))
+        .add_systems(PreUpdate, (clear_forces, clear_torques))
+        .add_systems(
+            PostUpdate,
+            (
+                (
+                    clear_events::<b2BeginContactEvent>,
+                    clear_events::<b2EndContactEvent>,
+                    clear_events::<b2BeginParticleBodyContactEvent>,
+                    clear_events::<b2EndParticleBodyContactEvent>,
+                )
+                    .in_set(LiquidFunSet::ClearEvents),
                 (
                     create_bodies,
                     create_fixtures,
@@ -41,19 +69,27 @@ impl Plugin for LiquidFunPlugin {
                     sync_bodies_to_world,
                     sync_revolute_joints_to_world,
                     sync_prismatic_joints_to_world,
-                    apply_forces,
-                    apply_torques,
-                    apply_gravity_scale,
-                    step_physics,
+                )
+                    .chain()
+                    .in_set(LiquidFunSet::SyncToPhysicsWorld),
+                (apply_forces, apply_torques, apply_gravity_scale)
+                    .chain()
+                    .in_set(LiquidFunSet::ApplyForces),
+                (step_physics).in_set(LiquidFunSet::Step),
+                (
                     sync_bodies_from_world,
                     sync_particle_systems_from_world,
-                    sync_contacts,
                     update_transforms,
+                    send_contact_events,
                 )
-                    .chain(),
-            )
-            .add_event::<b2BeginContactEvent>()
-            .add_event::<b2EndContactEvent>();
+                    .chain()
+                    .in_set(LiquidFunSet::SyncFromPhysicsWorld),
+            ),
+        )
+        .init_resource::<Events<b2BeginContactEvent>>()
+        .init_resource::<Events<b2EndContactEvent>>()
+        .init_resource::<Events<b2BeginParticleBodyContactEvent>>()
+        .init_resource::<Events<b2EndParticleBodyContactEvent>>();
     }
 }
 
@@ -89,6 +125,10 @@ fn clear_torques(mut external_torques: Query<&mut ExternalTorque>) {
     for mut external_torques in external_torques.iter_mut() {
         external_torques.torque = 0.;
     }
+}
+
+fn clear_events<T: 'static + Send + Sync + Event>(mut events: ResMut<Events<T>>) {
+    events.clear();
 }
 
 fn create_bodies(
@@ -309,25 +349,45 @@ fn sync_particle_systems_from_world(
     }
 }
 
-fn sync_contacts(
+fn send_contact_events(
     mut begin_contact_events: EventWriter<b2BeginContactEvent>,
     mut end_contact_events: EventWriter<b2EndContactEvent>,
+    mut begin_particle_body_contact_events: EventWriter<b2BeginParticleBodyContactEvent>,
+    mut end_particle_body_contact_events: EventWriter<b2EndParticleBodyContactEvent>,
     b2_world: NonSendMut<b2World>,
 ) {
     let contact_listener = b2_world.contact_listener();
     let mut contact_listener = contact_listener.borrow_mut();
-    let fixture_contacts = contact_listener.fixture_contacts();
-    let ended_contacts = contact_listener.ended_fixture_contacts();
-    for key in contact_listener.begun_fixture_contacts() {
-        // if the contact is not available in fixture contacts anymore, the contact has ended during the same frame
-        let contact = fixture_contacts.get(key).or(ended_contacts.get(key));
-        if let Some(contact) = contact {
-            begin_contact_events.send(b2BeginContactEvent(contact.clone()));
+
+    {
+        let fixture_contacts = contact_listener.fixture_contacts();
+        let ended_contacts = contact_listener.ended_fixture_contacts();
+        for key in contact_listener.begun_fixture_contacts() {
+            // if the contact is not available in fixture contacts anymore, the contact has ended during the same frame
+            let contact = fixture_contacts.get(key).or(ended_contacts.get(key));
+            if let Some(contact) = contact {
+                begin_contact_events.send(b2BeginContactEvent(contact.clone()));
+            }
+        }
+
+        for contact in ended_contacts.values() {
+            end_contact_events.send(b2EndContactEvent(contact.clone()))
         }
     }
 
-    for contact in ended_contacts.values() {
-        end_contact_events.send(b2EndContactEvent(contact.clone()))
+    {
+        let particle_body_contacts = contact_listener.particle_body_contacts();
+        for key in contact_listener.begun_particle_body_contacts() {
+            let contact = particle_body_contacts.get(key);
+            if let Some(contact) = contact {
+                begin_particle_body_contact_events
+                    .send(b2BeginParticleBodyContactEvent(contact.clone()));
+            }
+        }
+
+        for contact in contact_listener.ended_particle_body_contacts().values() {
+            end_particle_body_contact_events.send(b2EndParticleBodyContactEvent(contact.clone()))
+        }
     }
 
     contact_listener.clear_contact_changes();
