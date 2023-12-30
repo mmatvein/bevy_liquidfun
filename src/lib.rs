@@ -15,7 +15,14 @@ pub mod dynamics {
         mod prismatic_joint;
         pub use prismatic_joint::*;
     }
-    mod contacts;
+    mod contacts {
+        mod contact_events;
+        pub use contact_events::*;
+        mod contact_listener;
+        pub use contact_listener::*;
+        mod contacts;
+        pub use contacts::*;
+    }
     mod fixture;
     mod ray_cast;
     mod world;
