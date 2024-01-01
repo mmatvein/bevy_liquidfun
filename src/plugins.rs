@@ -1,14 +1,17 @@
-use crate::collision::b2Shape;
-use crate::dynamics::{
-    b2BeginContactEvent, b2BeginParticleBodyContactEvent, b2Body, b2EndContactEvent,
-    b2EndParticleBodyContactEvent, b2Fixture, b2Joint, b2PrismaticJoint, b2RevoluteJoint, b2World,
-    b2WorldSettings, ExternalForce, ExternalTorque, GravityScale, JointPtr,
-};
-use crate::internal::to_b2Vec2;
-use crate::particles::{b2ParticleGroup, b2ParticleSystem};
-use crate::utils::{DebugDrawFixtures, DebugDrawParticleSystem};
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
+
+use libliquidfun_sys::box2d::ffi::int32;
+
+use crate::collision::b2Shape;
+use crate::dynamics::{
+    b2BeginContactEvent, b2Body, b2EndContactEvent, b2Fixture, b2Joint, b2ParticleBodyContact,
+    b2ParticleContacts, b2PrismaticJoint, b2RevoluteJoint, b2World, b2WorldSettings, ExternalForce,
+    ExternalTorque, GravityScale, JointPtr,
+};
+use crate::internal::to_b2Vec2;
+use crate::particles::{b2ParticleGroup, b2ParticleSystem, b2ParticleSystemContacts};
+use crate::utils::{DebugDrawFixtures, DebugDrawParticleSystem};
 
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
 enum LiquidFunSet {
@@ -52,8 +55,6 @@ impl Plugin for LiquidFunPlugin {
                 (
                     clear_events::<b2BeginContactEvent>,
                     clear_events::<b2EndContactEvent>,
-                    clear_events::<b2BeginParticleBodyContactEvent>,
-                    clear_events::<b2EndParticleBodyContactEvent>,
                 )
                     .in_set(LiquidFunSet::ClearEvents),
                 (
@@ -81,15 +82,15 @@ impl Plugin for LiquidFunPlugin {
                     sync_particle_systems_from_world,
                     update_transforms,
                     send_contact_events,
+                    copy_particle_system_contacts,
+                    update_particle_body_contacts_components,
                 )
                     .chain()
                     .in_set(LiquidFunSet::SyncFromPhysicsWorld),
             ),
         )
         .init_resource::<Events<b2BeginContactEvent>>()
-        .init_resource::<Events<b2EndContactEvent>>()
-        .init_resource::<Events<b2BeginParticleBodyContactEvent>>()
-        .init_resource::<Events<b2EndParticleBodyContactEvent>>();
+        .init_resource::<Events<b2EndContactEvent>>();
     }
 }
 
@@ -197,11 +198,15 @@ fn create_prismatic_joints(
     }
 }
 fn create_particle_systems(
+    mut commands: Commands,
     mut b2_world: NonSendMut<b2World>,
     mut added: Query<(Entity, &mut b2ParticleSystem), Added<b2ParticleSystem>>,
 ) {
     for (entity, mut particle_system) in added.iter_mut() {
         b2_world.create_particle_system(entity, &mut particle_system);
+        commands
+            .entity(entity)
+            .insert(b2ParticleSystemContacts::default());
     }
 }
 
@@ -352,8 +357,6 @@ fn sync_particle_systems_from_world(
 fn send_contact_events(
     mut begin_contact_events: EventWriter<b2BeginContactEvent>,
     mut end_contact_events: EventWriter<b2EndContactEvent>,
-    mut begin_particle_body_contact_events: EventWriter<b2BeginParticleBodyContactEvent>,
-    mut end_particle_body_contact_events: EventWriter<b2EndParticleBodyContactEvent>,
     b2_world: NonSendMut<b2World>,
 ) {
     let contact_listener = b2_world.contact_listener();
@@ -375,22 +378,52 @@ fn send_contact_events(
         }
     }
 
-    {
-        let particle_body_contacts = contact_listener.particle_body_contacts();
-        for key in contact_listener.begun_particle_body_contacts() {
-            let contact = particle_body_contacts.get(key);
-            if let Some(contact) = contact {
-                begin_particle_body_contact_events
-                    .send(b2BeginParticleBodyContactEvent(contact.clone()));
-            }
-        }
+    contact_listener.clear_contact_changes();
+}
 
-        for contact in contact_listener.ended_particle_body_contacts().values() {
-            end_particle_body_contact_events.send(b2EndParticleBodyContactEvent(contact.clone()))
-        }
+fn copy_particle_system_contacts(
+    b2_world: NonSendMut<b2World>,
+    mut particle_systems: Query<(Entity, &mut b2ParticleSystemContacts)>,
+) {
+    for (entity, mut particle_system_contacts) in &mut particle_systems {
+        let particle_system_ptr = b2_world.get_particle_system_ptr(&entity).unwrap();
+        let body_contacts = unsafe {
+            let body_contacts = particle_system_ptr.as_ref().GetBodyContacts();
+            let count = i32::from(int32::from(
+                particle_system_ptr.as_ref().GetBodyContactCount(),
+            )) as usize;
+            std::slice::from_raw_parts(body_contacts, count)
+        };
+
+        let new_body_contacts = particle_system_contacts.body_contacts_mut();
+        new_body_contacts.clear();
+        new_body_contacts.extend(
+            body_contacts
+                .iter()
+                .map(|c| b2ParticleBodyContact::from_ffi_contact(c)),
+        );
+    }
+}
+
+fn update_particle_body_contacts_components(
+    mut particle_contact_components: Query<(Entity, &mut b2ParticleContacts), With<b2Body>>,
+    particle_system_contacts: Query<&b2ParticleSystemContacts>,
+) {
+    for (_, mut particle_contact_component) in &mut particle_contact_components {
+        particle_contact_component.contacts_mut().clear();
     }
 
-    contact_listener.clear_contact_changes();
+    for particle_system in &particle_system_contacts {
+        for contact in particle_system.body_contacts() {
+            for (entity, mut particle_contact_component) in &mut particle_contact_components {
+                if contact.body == entity {
+                    particle_contact_component
+                        .contacts_mut()
+                        .insert(contact.particle_index);
+                }
+            }
+        }
+    }
 }
 
 fn update_transforms(

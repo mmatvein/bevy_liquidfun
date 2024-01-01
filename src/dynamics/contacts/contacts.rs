@@ -1,12 +1,12 @@
+use std::collections::HashSet;
 use std::pin::Pin;
 
 use autocxx::WithinBox;
 use bevy::math::Vec2;
-use bevy::prelude::Entity;
+use bevy::prelude::{Component, Entity};
 
 use libliquidfun_sys::box2d::ffi::{
-    b2Contact as ffi_b2Contact, b2Fixture, b2ParticleBodyContact as ffi_b2ParticleBodyContact,
-    b2ParticleSystem, b2WorldManifold,
+    b2Contact as ffi_b2Contact, b2ParticleBodyContact as ffi_b2ParticleBodyContact, b2WorldManifold,
 };
 
 use crate::internal::to_Vec2;
@@ -20,17 +20,6 @@ pub struct b2Contact {
     pub body_b: Entity,
     pub points: [Vec2; 2],
     pub normal: Vec2,
-}
-
-#[allow(non_camel_case_types)]
-#[derive(Debug, Copy, Clone)]
-pub struct b2ParticleBodyContact {
-    pub particle_index: i32,
-    pub fixture: Entity,
-    pub body: Entity,
-    pub weight: f32,
-    pub normal: Vec2,
-    pub mass: f32,
 }
 
 impl b2Contact {
@@ -81,12 +70,23 @@ impl b2Contact {
     }
 }
 
+#[allow(non_camel_case_types)]
+#[derive(Debug, Copy, Clone)]
+pub struct b2ParticleBodyContact {
+    pub particle_index: i32,
+    pub fixture: Entity,
+    pub body: Entity,
+    pub weight: f32,
+    pub normal: Vec2,
+    pub mass: f32,
+}
+
 impl b2ParticleBodyContact {
-    pub(crate) fn from_ffi_contact(contact: &mut ffi_b2ParticleBodyContact) -> Self {
+    pub(crate) fn from_ffi_contact(contact: &ffi_b2ParticleBodyContact) -> Self {
         unsafe {
             let mut contact = Pin::new_unchecked(contact);
-            let mut fixture = Pin::new_unchecked(contact.as_mut().fixture.as_mut().unwrap());
-            let mut body = Pin::new_unchecked(contact.as_mut().body.as_mut().unwrap());
+            let mut fixture = Pin::new_unchecked(contact.as_ref().fixture.as_mut().unwrap());
+            let mut body = Pin::new_unchecked(contact.as_ref().body.as_mut().unwrap());
 
             let fixture_entity = Entity::from_bits(
                 fixture.as_mut().GetUserData().get_unchecked_mut().pointer as u64,
@@ -106,22 +106,28 @@ impl b2ParticleBodyContact {
             }
         }
     }
+}
 
-    pub(crate) fn get_contact_key(&self) -> (Entity, i32) {
-        (self.fixture, self.particle_index)
+#[allow(non_camel_case_types)]
+#[derive(Component, Debug)]
+pub struct b2ParticleContacts {
+    contacts: HashSet<i32>,
+}
+
+impl Default for b2ParticleContacts {
+    fn default() -> Self {
+        Self {
+            contacts: Default::default(),
+        }
+    }
+}
+
+impl b2ParticleContacts {
+    pub fn contacts(&self) -> &HashSet<i32> {
+        &self.contacts
     }
 
-    pub(crate) fn get_key_for_ended_contact(
-        fixture: &mut b2Fixture,
-        _particle_system: &mut b2ParticleSystem,
-        particle_index: i32,
-    ) -> (Entity, i32) {
-        unsafe {
-            let mut fixture = Pin::new_unchecked(fixture);
-            let fixture_entity = Entity::from_bits(
-                fixture.as_mut().GetUserData().get_unchecked_mut().pointer as u64,
-            );
-            (fixture_entity, particle_index)
-        }
+    pub(crate) fn contacts_mut(&mut self) -> &mut HashSet<i32> {
+        &mut self.contacts
     }
 }

@@ -3,7 +3,7 @@ use bevy::prelude::{Component, Entity};
 use libliquidfun_sys::box2d::ffi;
 use libliquidfun_sys::box2d::ffi::int32;
 
-use crate::dynamics::b2World;
+use crate::dynamics::{b2ParticleBodyContact, b2World};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone)]
@@ -123,5 +123,21 @@ impl b2ParticleSystem {
         unsafe {
             self.positions.set_len(particle_count);
         }
+    }
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Component, Debug, Default)]
+pub struct b2ParticleSystemContacts {
+    body_contacts: Vec<b2ParticleBodyContact>,
+}
+
+impl b2ParticleSystemContacts {
+    pub fn body_contacts(&self) -> &Vec<b2ParticleBodyContact> {
+        &self.body_contacts
+    }
+
+    pub(crate) fn body_contacts_mut(&mut self) -> &mut Vec<b2ParticleBodyContact> {
+        &mut self.body_contacts
     }
 }
