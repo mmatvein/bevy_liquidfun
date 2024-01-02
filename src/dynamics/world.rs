@@ -260,6 +260,13 @@ impl<'a> b2World<'a> {
         self.particle_system_ptrs.get(particle_system_entity)
     }
 
+    pub(crate) fn get_particle_system_ptr_mut(
+        &mut self,
+        particle_system_entity: &Entity,
+    ) -> Option<&mut Pin<&'a mut ffi::b2ParticleSystem>> {
+        self.particle_system_ptrs.get_mut(particle_system_entity)
+    }
+
     pub(crate) fn get_joint_ptr(&mut self, joint_entity: &Entity) -> Option<&mut JointPtr<'a>> {
         self.joint_ptrs.get_mut(joint_entity)
     }

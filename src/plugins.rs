@@ -66,6 +66,7 @@ impl Plugin for LiquidFunPlugin {
                     create_particle_groups,
                     destroy_removed_fixtures,
                     destroy_removed_bodies,
+                    destroy_queued_particles,
                     apply_deferred,
                     sync_bodies_to_world,
                     sync_revolute_joints_to_world,
@@ -237,6 +238,16 @@ fn destroy_removed_bodies(
         }
 
         b2_world.destroy_body_for_entity(entity);
+    }
+}
+
+fn destroy_queued_particles(
+    mut b2_world: NonSendMut<b2World>,
+    mut query: Query<(Entity, &mut b2ParticleSystem)>,
+) {
+    for (entity, mut particle_system) in &mut query {
+        let particle_system_ptr = b2_world.get_particle_system_ptr_mut(&entity).unwrap();
+        particle_system.process_destruction_queue(particle_system_ptr.as_mut());
     }
 }
 

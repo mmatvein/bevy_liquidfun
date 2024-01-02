@@ -84,7 +84,7 @@ pub struct b2ParticleBodyContact {
 impl b2ParticleBodyContact {
     pub(crate) fn from_ffi_contact(contact: &ffi_b2ParticleBodyContact) -> Self {
         unsafe {
-            let mut contact = Pin::new_unchecked(contact);
+            let contact = Pin::new_unchecked(contact);
             let mut fixture = Pin::new_unchecked(contact.as_ref().fixture.as_mut().unwrap());
             let mut body = Pin::new_unchecked(contact.as_ref().body.as_mut().unwrap());
 

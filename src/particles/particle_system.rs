@@ -1,5 +1,8 @@
+use std::pin::Pin;
+
 use bevy::math::Vec2;
 use bevy::prelude::{Component, Entity};
+
 use libliquidfun_sys::box2d::ffi;
 use libliquidfun_sys::box2d::ffi::int32;
 
@@ -95,6 +98,7 @@ impl b2ParticleSystemDef {
 pub struct b2ParticleSystem {
     positions: Vec<Vec2>,
     definition: b2ParticleSystemDef,
+    destruction_queue: Vec<i32>,
 }
 
 impl b2ParticleSystem {
@@ -102,6 +106,7 @@ impl b2ParticleSystem {
         b2ParticleSystem {
             positions: Vec::with_capacity(def.max_count as usize),
             definition: def.clone(),
+            destruction_queue: Default::default(),
         }
     }
 
@@ -116,6 +121,10 @@ impl b2ParticleSystem {
         return &self.positions;
     }
 
+    pub fn queue_particle_for_destruction(&mut self, particle_index: i32) {
+        self.destruction_queue.push(particle_index);
+    }
+
     pub(crate) fn sync_with_world(&mut self, entity: Entity, b2_world: &b2World) {
         let particle_system_ptr = b2_world.get_particle_system_ptr(&entity).unwrap();
         let particle_count = particle_system_ptr.as_ref().GetParticleCount();
@@ -123,6 +132,19 @@ impl b2ParticleSystem {
         unsafe {
             self.positions.set_len(particle_count);
         }
+    }
+
+    pub(crate) fn process_destruction_queue(
+        &mut self,
+        mut ffi_particle_system: Pin<&mut ffi::b2ParticleSystem>,
+    ) {
+        for particle in &self.destruction_queue {
+            ffi_particle_system
+                .as_mut()
+                .DestroyParticle(int32::from(*particle));
+        }
+
+        self.destruction_queue.clear();
     }
 }
 
