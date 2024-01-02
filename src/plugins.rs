@@ -14,7 +14,7 @@ use crate::particles::{b2ParticleGroup, b2ParticleSystem, b2ParticleSystemContac
 use crate::utils::{DebugDrawFixtures, DebugDrawParticleSystem};
 
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
-enum LiquidFunSet {
+pub enum LiquidFunSet {
     ClearEvents,
     SyncToPhysicsWorld,
     ApplyForces,
