@@ -1,5 +1,9 @@
+use crate::internal::to_b2Vec2;
 use bevy::math::Vec2;
 use bitflags::bitflags;
+use libliquidfun_sys::box2d::ffi;
+use libliquidfun_sys::box2d::ffi::{b2ParticleColor, uint32, uint8};
+use std::ffi::c_void;
 
 bitflags! {
     #[allow(non_camel_case_types)]
@@ -54,9 +58,29 @@ bitflags! {
 }
 
 #[allow(non_camel_case_types)]
+#[derive(Clone, Debug)]
 pub struct b2ParticleDef {
     pub flags: b2ParticleFlags,
     pub position: Vec2,
     pub velocity: Vec2,
     pub lifetime: f32,
+}
+
+impl b2ParticleDef {
+    pub(crate) fn to_ffi(&self) -> ffi::b2ParticleDef {
+        ffi::b2ParticleDef {
+            flags: uint32::from(self.flags.bits()),
+            position: to_b2Vec2(&self.position),
+            velocity: to_b2Vec2(&self.velocity),
+            color: b2ParticleColor {
+                r: uint8::default(),
+                g: uint8::default(),
+                b: uint8::default(),
+                a: uint8::default(),
+            },
+            lifetime: 0.0,
+            userData: 0 as *mut c_void,
+            group: 0 as *mut _,
+        }
+    }
 }

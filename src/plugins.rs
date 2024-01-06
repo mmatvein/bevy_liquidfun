@@ -64,6 +64,7 @@ impl Plugin for LiquidFunPlugin {
                     create_prismatic_joints,
                     create_particle_systems,
                     create_particle_groups,
+                    create_queued_particles,
                     destroy_removed_fixtures,
                     destroy_removed_bodies,
                     destroy_queued_particles,
@@ -221,6 +222,16 @@ fn create_particle_groups(
             entity,
             &mut particle_group,
         );
+    }
+}
+
+fn create_queued_particles(
+    mut b2_world: NonSendMut<b2World>,
+    mut query: Query<(Entity, &mut b2ParticleSystem)>,
+) {
+    for (entity, mut particle_system) in &mut query {
+        let particle_system_ptr = b2_world.get_particle_system_ptr_mut(&entity).unwrap();
+        particle_system.process_creation_queue(particle_system_ptr.as_mut());
     }
 }
 

@@ -7,6 +7,7 @@ use libliquidfun_sys::box2d::ffi;
 use libliquidfun_sys::box2d::ffi::int32;
 
 use crate::dynamics::{b2ParticleBodyContact, b2World};
+use crate::particles::b2ParticleDef;
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone)]
@@ -98,6 +99,7 @@ impl b2ParticleSystemDef {
 pub struct b2ParticleSystem {
     positions: Vec<Vec2>,
     definition: b2ParticleSystemDef,
+    creation_queue: Vec<b2ParticleDef>,
     destruction_queue: Vec<i32>,
 }
 
@@ -106,7 +108,8 @@ impl b2ParticleSystem {
         b2ParticleSystem {
             positions: Vec::with_capacity(def.max_count as usize),
             definition: def.clone(),
-            destruction_queue: Default::default(),
+            creation_queue: Vec::new(),
+            destruction_queue: Vec::new(),
         }
     }
 
@@ -121,6 +124,10 @@ impl b2ParticleSystem {
         return &self.positions;
     }
 
+    pub fn queue_particle_for_creation(&mut self, def: &b2ParticleDef) {
+        self.creation_queue.push(def.clone());
+    }
+
     pub fn queue_particle_for_destruction(&mut self, particle_index: i32) {
         self.destruction_queue.push(particle_index);
     }
@@ -132,6 +139,19 @@ impl b2ParticleSystem {
         unsafe {
             self.positions.set_len(particle_count);
         }
+    }
+
+    pub(crate) fn process_creation_queue(
+        &mut self,
+        mut ffi_particle_system: Pin<&mut ffi::b2ParticleSystem>,
+    ) {
+        for particle in &self.creation_queue {
+            ffi_particle_system
+                .as_mut()
+                .CreateParticle(&particle.to_ffi());
+        }
+
+        self.creation_queue.clear();
     }
 
     pub(crate) fn process_destruction_queue(
