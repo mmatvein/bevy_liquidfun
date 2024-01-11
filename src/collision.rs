@@ -9,9 +9,25 @@ use crate::internal::*;
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone)]
 pub enum b2Shape {
-    Circle { radius: f32, position: Vec2 },
-    EdgeTwoSided { v1: Vec2, v2: Vec2 },
-    Polygon { vertices: Vec<Vec2> },
+    Circle {
+        radius: f32,
+        position: Vec2,
+    },
+    EdgeTwoSided {
+        v1: Vec2,
+        v2: Vec2,
+    },
+    Polygon {
+        vertices: Vec<Vec2>,
+    },
+    Chain {
+        vertices: Vec<Vec2>,
+        prev_vertex: Vec2,
+        next_vertex: Vec2,
+    },
+    ChainLoop {
+        vertices: Vec<Vec2>,
+    },
 }
 
 impl b2Shape {
@@ -50,11 +66,18 @@ impl b2Shape {
             .collect();
         b2Shape::Polygon { vertices }
     }
+
     pub(crate) fn to_ffi<'a>(&self) -> &'a ffi::b2Shape {
         match self {
             b2Shape::Circle { radius, position } => circle_to_ffi(*radius, *position),
             b2Shape::EdgeTwoSided { v1, v2 } => edge_to_ffi(*v1, *v2),
             b2Shape::Polygon { vertices } => polygon_to_ffi(vertices),
+            b2Shape::Chain {
+                vertices,
+                prev_vertex,
+                next_vertex,
+            } => chain_to_ffi(vertices, *prev_vertex, *next_vertex),
+            b2Shape::ChainLoop { vertices } => chain_loop_to_ffi(vertices),
         }
     }
 }
@@ -102,6 +125,47 @@ fn polygon_to_ffi<'a>(vertices: &Vec<Vec2>) -> &'a ffi::b2Shape {
             .pin_mut()
             .Set(vertices.as_ptr(), ffi::int32::from(count));
         std::mem::forget(vertices);
+    }
+
+    let shape_ptr = shape.into_raw();
+    unsafe {
+        let ffi_shape: &ffi::b2Shape = shape_ptr.as_ref().unwrap().as_ref();
+        return ffi_shape;
+    }
+}
+
+fn chain_to_ffi<'a>(
+    vertices: &Vec<Vec2>,
+    next_vertex: Vec2,
+    prev_vertex: Vec2,
+) -> &'a ffi::b2Shape {
+    let mut shape = ffi::b2ChainShape::new().within_unique_ptr();
+    let vertices: Vec<b2Vec2> = vertices.iter().map(|v| to_b2Vec2(v)).collect();
+    let count: i32 = vertices.len().try_into().unwrap();
+    unsafe {
+        shape.pin_mut().CreateChain(
+            vertices.as_ptr(),
+            ffi::int32::from(count),
+            &to_b2Vec2(&prev_vertex),
+            &to_b2Vec2(&next_vertex),
+        );
+    }
+
+    let shape_ptr = shape.into_raw();
+    unsafe {
+        let ffi_shape: &ffi::b2Shape = shape_ptr.as_ref().unwrap().as_ref();
+        return ffi_shape;
+    }
+}
+
+fn chain_loop_to_ffi<'a>(vertices: &Vec<Vec2>) -> &'a ffi::b2Shape {
+    let mut shape = ffi::b2ChainShape::new().within_unique_ptr();
+    let vertices: Vec<b2Vec2> = vertices.iter().map(|v| to_b2Vec2(v)).collect();
+    let count: i32 = vertices.len().try_into().unwrap();
+    unsafe {
+        shape
+            .pin_mut()
+            .CreateLoop(vertices.as_ptr(), ffi::int32::from(count));
     }
 
     let shape_ptr = shape.into_raw();

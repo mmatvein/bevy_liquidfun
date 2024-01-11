@@ -499,7 +499,7 @@ fn draw_fixtures(
             b2Shape::EdgeTwoSided { v1, v2 } => {
                 gizmos.line_2d(to_global(transform, *v1), to_global(transform, *v2), color);
             }
-            b2Shape::Polygon { vertices } => {
+            b2Shape::Polygon { vertices } | b2Shape::ChainLoop { vertices } => {
                 gizmos.linestrip_2d(
                     vertices
                         .iter()
@@ -507,6 +507,13 @@ fn draw_fixtures(
                         .map(|v| to_global(transform, *v)),
                     color,
                 );
+            }
+            b2Shape::Chain {
+                vertices,
+                prev_vertex: _p,
+                next_vertex: _n,
+            } => {
+                gizmos.linestrip_2d(vertices.iter().map(|v| to_global(transform, *v)), color);
             }
         }
 
